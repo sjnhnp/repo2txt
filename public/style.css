@@ -467,3 +467,69 @@ button i {
     border-top-color: #fff; /* White spinner on blue button */
 }
 
+/* style.css */
+
+/* Target the form elements within repoForm for better scoping */
+#repoForm input[type="text"],
+#repoForm input[type="password"],
+#repoForm button {
+    /* Ensure consistent box model for easier height/padding management */
+    box-sizing: border-box;
+    /* Set a consistent height for inputs and the button */
+    height: 40px; /* Adjust as needed */
+    padding: 0.5em 0.75em; /* Adjust padding for aesthetics */
+    margin-bottom: 15px; /* Consistent bottom margin */
+    vertical-align: middle; /* Helps if they are inline-block and somehow misaligned */
+}
+
+/* Specific adjustments for the PAT input */
+#repoForm #patInput {
+    /* If it's still not aligning, you might need to ensure it's taking up appropriate width
+       or is in the same display context as the button if they are meant to be side-by-side.
+       Assuming it's block or full width by default based on the image. */
+}
+
+/* Specific adjustments for the Fetch button */
+#repoForm #fetchStructureBtn {
+    /* 1b: Adjust button length - make it fit content or a specific reasonable width */
+    width: auto; /* Let content and padding define width */
+    /* OR for a fixed width, e.g.:
+    width: 250px;
+    max-width: 100%; prevent overflow on small screens */
+
+    /* 1c: Change background color to be more low-key */
+    background-color: #6c757d; /* A common "secondary" button color (Bootstrap-like gray) */
+    /* color: white; /* Ensure text is readable */
+    border: 1px solid #6c757d; /* Optional: matching border */
+    /* You can also use a lighter gray or a muted version of your primary color */
+    /* e.g., background-color: #f0f0f0; color: #333; border: 1px solid #ccc; */
+}
+
+#repoForm #fetchStructureBtn:hover {
+    background-color: #5a6268; /* Darken slightly on hover */
+    border-color: #545b62;
+}
+
+/* If the PAT input and Fetch button are meant to be on the same line: */
+/* You might need a wrapper div with display: flex */
+/* Example HTML:
+<div class="form-row-flex">
+    <input type="password" id="patInput" ... >
+    <button type="button" id="fetchStructureBtn" ... >...</button>
+</div>
+*/
+/* CSS for flex row:
+.form-row-flex {
+    display: flex;
+    align-items: center; /* Vertically align items */
+    gap: 10px; /* Space between items */
+}
+.form-row-flex #patInput {
+    flex-grow: 1; /* Input takes available space */
+    margin-bottom: 0; /* Remove margin if handled by gap */
+}
+.form-row-flex #fetchStructureBtn {
+    flex-shrink: 0; /* Button doesn't shrink */
+    margin-bottom: 0; /* Remove margin if handled by gap */
+    width: auto; /* Ensure it's not 100% width from other rules */
+}
