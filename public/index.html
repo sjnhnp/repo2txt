@@ -4,73 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repo2Txt Enhanced</title>
+    <!-- Link CSS file -->
     <link rel="stylesheet" href="style.css">
+    <!-- Optional: Link CSS Icon library if used -->
+    <link rel="stylesheet" href="https://css.gg/css?=|copy|poll|search-loading|software-download">
 </head>
 <body>
     <h1>Convert GitHub Repository to Text</h1>
+    <p>Enter a GitHub repository URL to fetch its structure, select files, and generate a combined text output.</p>
 
     <!-- Input Area -->
     <form id="repoForm">
         <label for="repoUrl">GitHub Repository URL:</label>
-        <input type="text" id="repoUrl" name="repoUrl" required placeholder="https://github.com/owner/repo">
+        <input type="text" id="repoUrl" name="repoUrl" required placeholder="https://github.com/owner/repo[/tree/branch]">
 
         <!-- 1. Optional PAT Input -->
-        <label for="patInput">Personal Access Token (optional - for private repos & higher rate limits): <span title="Token requires 'repo' scope for private repositories. It's sent to the backend function but not stored long-term.">ℹ️</span></label>
-        <input type="password" id="patInput" name="patInput" placeholder="ghp_...">
+        <label for="patInput">Personal Access Token (optional - for private repos & higher rate limits): <span class="tooltip" title="Token requires 'repo' scope for private repositories. It's sent securely to the backend function during the request but is not stored.">ℹ️</span></label>
+        <input type="password" id="patInput" name="patInput" placeholder="Starts with ghp_...">
 
         <!-- 2. Fetch Button -->
         <button type="button" id="fetchStructureBtn"> <i class="gg-search-loading"></i> Fetch Directory Structure</button>
-         <!-- Optional: Convert from local -->
-         <!-- <button type="button" id="convertLocalBtn" style="margin-left: 10px;">Convert From Local Directory Instead</button> -->
     </form>
 
-    <!-- Status & Tree Area -->
-    <div id="statusArea" style="display: none;">
+    <!-- Status & Error Area -->
+    <div id="statusArea" class="status" style="display: none;">
         <p><span id="spinner" class="spinner" style="display: none;"></span> <span id="statusText"></span></p>
     </div>
+    <p id="errorMessage" class="error" style="display: none;"></p>
 
-    <!-- 3. File Tree View -->
+    <!-- File Selection Area (Initially Hidden) -->
     <div id="filterArea" style="display: none;">
-         <h4>Filter by file extensions:</h4>
+         <hr>
+         <h4>Filter by file extensions/types:</h4>
          <div id="extensionFilters">
              <!-- Filters will be populated by JS -->
+             <span class="placeholder-text">Loading filters...</span>
          </div>
-         <h4>Select files/directories:</h4>
+         <h4>Select files to include:</h4>
+         <!-- 3. File Tree View -->
          <div id="fileTreeContainer" class="file-tree">
              <!-- Tree will be populated by JS -->
+             <span class="placeholder-text">Loading file list...</span>
          </div>
-         <button type="button" id="selectAllBtn">Select All</button>
-         <button type="button" id="deselectAllBtn">Deselect All</button>
+         <div class="tree-actions">
+            <button type="button" id="selectAllBtn">Select All Visible</button>
+            <button type="button" id="deselectAllBtn">Deselect All Visible</button>
+         </div>
     </div>
 
 
-    <!-- Generation & Result Area -->
+    <!-- Generation Area (Initially Hidden) -->
     <div id="generationArea" style="display: none;">
          <!-- 4. Generate Text Button -->
         <button type="button" id="generateTextBtn"> <i class="gg-poll"></i> Generate Text File</button>
-        <span id="tokenCountArea" style="margin-left: 15px; font-size: 0.9em;"></span>
+        <span id="tokenCountArea" style="margin-left: 15px; font-size: 0.9em; color: #555;"></span>
     </div>
 
+    <!-- Result Preview & Actions Area (Initially Hidden) -->
     <div id="resultContainer" style="display: none;">
         <hr>
         <h3>Preview and Output</h3>
          <!-- 7. File Content Preview -->
          <div id="outputPreview">
-            <pre><code id="structurePreview"></code></pre> {/* For structure (6) */}
-            <pre><code id="contentPreview"></code></pre> {/* For content */}
+            <label>Structure Preview:</label>
+            <pre><code id="structurePreview">(Structure will appear here)</code></pre> {/* For structure (6) */}
+            <label>Content Preview:</label>
+            <pre><code id="contentPreview">(Content will appear here)</code></pre> {/* For content */}
          </div>
          <!-- 8 & 9. Action Buttons -->
          <div id="outputActions">
              <button type="button" id="copyBtn"> <i class="gg-copy"></i> Copy to Clipboard</button>
              <button type="button" id="downloadTxtBtn"> <i class="gg-software-download"></i> Download Text File</button>
-             <!-- 5. Download Zip Button (Placeholder for future) -->
+             <!-- 5. Download Zip Button (Placeholder for future - currently disabled) -->
              <!-- <button type="button" id="downloadZipBtn" disabled title="Zip functionality not yet implemented">Download Zip</button> -->
          </div>
     </div>
 
-    <!-- Error Message Area -->
-    <p id="errorMessage" class="error"></p>
-
+    <!-- Link JavaScript file -->
     <script src="script.js"></script>
     <!-- Optional: Add library for token counting if needed -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/gpt3-tokenizer@1.1.5/dist/gpt3-tokenizer.min.js"></script> -->
