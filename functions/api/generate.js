@@ -42,9 +42,9 @@ const MAX_TOTAL_SIZE_MB = 10; // 限制总内容大小(MB)
  * @returns {object|null} 包含 { owner, repo, branch } 的对象,无效则返回null
  */
 function parseGitHubUrl(url) {
-    console.log(`尝试解析URL: "${url}"`);
+  //  console.log(`尝试解析URL: "${url}"`);
     if (!url || typeof url !== 'string') {
-        console.log("解析失败: URL为空或不是字符串");
+    //    console.log("解析失败: URL为空或不是字符串");
         return null;
     }
     
@@ -56,11 +56,11 @@ function parseGitHubUrl(url) {
             repo: match[2],
             branch: match[3] || 'HEAD', // 使用HEAD作为默认值
         };
-        console.log("URL解析成功:", parsed);
+      //  console.log("URL解析成功:", parsed);
         return parsed;
     }
     
-    console.log("解析失败: URL格式不匹配");
+   // console.log("解析失败: URL格式不匹配");
     return null;
 }
 
@@ -262,7 +262,7 @@ export async function onRequestPost(context) {
 
         // --- Action: Get Tree ---
         if (action === 'getTree') {
-            console.log(`执行动作: getTree，目标 ${owner}/${repo}/${branch}`);
+         //   console.log(`执行动作: getTree，目标 ${owner}/${repo}/${branch}`);
             const treeApiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
 
             const treeResponse = await fetch(treeApiUrl, { headers: baseHeaders });
@@ -379,7 +379,7 @@ export async function onRequestPost(context) {
                 return false; // 排除未知类型
             });
 
-            console.log(`过滤后返回 ${filteredTree.length} 个项目(文件和目录)给前端。`);
+         //   console.log(`过滤后返回 ${filteredTree.length} 个项目(文件和目录)给前端。`);
 
             // 发送过滤后的列表
             return new Response(
@@ -399,7 +399,7 @@ export async function onRequestPost(context) {
 
         // --- Action: Generate Text ---
         else if (action === 'generateText') {
-            console.log(`执行动作: generateText，目标 ${owner}/${repo}/${branch}`);
+        //    console.log(`执行动作: generateText，目标 ${owner}/${repo}/${branch}`);
 
             // 验证selectedFiles输入
             if (!selectedFiles || !Array.isArray(selectedFiles)) {
@@ -460,7 +460,7 @@ export async function onRequestPost(context) {
                  }
                 
                 const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(filePath)}`;
-                console.log(`获取文件内容: ${filePath}`);
+            //    console.log(`获取文件内容: ${filePath}`);
                 
                 try {
                     const contentResponse = await fetch(rawUrl, { 
@@ -520,7 +520,7 @@ export async function onRequestPost(context) {
                  }
             });
 
-            console.log(`成功处理 ${fetchedFileCount} / ${selectedFiles.length} 个选定文件。总获取大小: ${(totalSize / (1024*1024)).toFixed(2)} MB.`);
+        //    console.log(`成功处理 ${fetchedFileCount} / ${selectedFiles.length} 个选定文件。总获取大小: ${(totalSize / (1024*1024)).toFixed(2)} MB.`);
             
             if (sizeLimitReached) {
                 combinedContent += `\n\n--- WARNING: Reached total size limit (${MAX_TOTAL_SIZE_MB}MB). Output may be incomplete. Processed ${fetchedFileCount} files. ---\n`;
