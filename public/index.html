@@ -4,88 +4,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Repo2Txt</title>
-    <!-- Link CSS file -->
     <link rel="stylesheet" href="style.css">
-    <!-- Optional: Link CSS Icon library if used -->
-    <link rel="stylesheet" href="https://css.gg/css?=|copy|poll|search-loading|software-download">
+    <link rel="stylesheet" href="https://css.gg/css?=|copy|poll|search-loading|software-download|log-in|log-off|shield-check">
+    
+    <!-- 
+      PASSWORD_HASH_PLACEHOLDER: Middleware will inject the expected password hash here.
+      Client-side password.js SHOULD NOT use this for direct comparison. 
+      It's mainly for scenarios where the password page might need some server-provided config.
+      For our flow, password.js will hash input and send to /auth for server-side verification.
+    -->
+    <script>
+      window.__ENV__ = { 
+        PASSWORD_HASH_FROM_SERVER_DO_NOT_USE_FOR_CLIENT_VALIDATION: "{{PASSWORD_HASH_PLACEHOLDER}}" 
+      };
+    </script>
 </head>
 <body>
-    <h1>Convert GitHub Repository to Text</h1>
-    <p>Enter a GitHub repository URL to fetch its structure, select files, and generate a combined text output.</p>
 
-    <!-- Input Area -->
-    <form id="repoForm">
-        <label for="repoUrl">GitHub Repository URL:</label>
-        <input type="text" id="repoUrl" name="repoUrl" required placeholder="https://github.com/owner/repo[/tree/branch]">
-
-        <!-- 1. Optional PAT Input -->
-        <label for="patInput">Personal Access Token (optional - for private repos & higher rate limits): <span class="tooltip" title="Token requires 'repo' scope for private repositories. It's sent securely to the backend function during the request but is not stored.">ℹ️</span></label>
-        <input type="password" id="patInput" name="patInput" placeholder="Starts with ghp_...">
-
-        <!-- 2. Fetch Button -->
-        <button type="button" id="fetchStructureBtn"> <i class="gg-search-loading"></i> Fetch Directory Structure</button>
-    </form>
-
-    <!-- Status & Error Area -->
-    <div id="statusArea" class="status" style="display: none;">
-        <p><span id="spinner" class="spinner" style="display: none;"></span> <span id="statusText"></span></p>
-    </div>
-    <p id="errorMessage" class="error" style="display: none;"></p>
-
-    <!-- File Selection Area (Initially Hidden) -->
-    <div id="filterArea" style="display: none;">
-         <hr>
-         <h4>Filter by file extensions/types:</h4>
-         <div id="extensionFilters">
-             <!-- Filters will be populated by JS -->
-             <span class="placeholder-text">Loading filters...</span>
-         </div>
-         <h4>Select files to include:</h4>
-         <!-- 3. File Tree View -->
-         <div id="fileTreeContainer" class="file-tree">
-             <!-- Tree will be populated by JS -->
-             <span class="placeholder-text">Loading file list...</span>
-         </div>
-         <div class="tree-actions">
-            <button type="button" id="selectAllBtn">Select All Visible</button>
-            <button type="button" id="deselectAllBtn">Deselect All Visible</button>
-         </div>
+    <!-- Password Protection Container -->
+    <div id="password-container" style="display: none;">
+        <div class="auth-form-container">
+            <h1><i class="gg-shield-check"></i> Protected Area</h1>
+            <p>Please enter the password to access this application.</p>
+            <form id="password-form">
+                <label for="password-input">Password:</label>
+                <input type="password" id="password-input" required>
+                <button type="submit" id="password-submit-btn"><i class="gg-log-in"></i> Unlock</button>
+            </form>
+            <p id="password-error-message" class="error" style="display: none;"></p>
+        </div>
     </div>
 
+    <!-- Main Application Container (initially hidden if password protection is active) -->
+    <div id="app-container" style="display: none;">
+        <div class="app-header">
+            <h1>Convert GitHub Repository to Text</h1>
+            <button type="button" id="logoutBtn" title="Logout"><i class="gg-log-off"></i> Logout</button>
+        </div>
+        <p>Enter a GitHub repository URL to fetch its structure, select files, and generate a combined text output.</p>
 
-    <!-- Generation Area (Initially Hidden) -->
-    <div id="generationArea" style="display: none;">
-         <!-- 4. Generate Text Button -->
-        <button type="button" id="generateTextBtn"> <i class="gg-poll"></i> Generate Text File</button>
-        <span id="tokenCountArea" style="margin-left: 15px; font-size: 0.9em; color: #555;"></span>
+        <!-- Input Area -->
+        <form id="repoForm">
+            <label for="repoUrl">GitHub Repository URL:</label>
+            <input type="text" id="repoUrl" name="repoUrl" required placeholder="https://github.com/owner/repo[/tree/branch]">
+
+            <label for="patInput">Personal Access Token (optional - for private repos & higher rate limits): <span class="tooltip" title="Token requires 'repo' scope for private repositories. It's sent securely to the backend function during the request but is not stored.">ℹ️</span></label>
+            <input type="password" id="patInput" name="patInput" placeholder="Starts with ghp_...">
+
+            <button type="button" id="fetchStructureBtn"> <i class="gg-search-loading"></i> Fetch Directory Structure</button>
+        </form>
+
+        <!-- Status & Error Area -->
+        <div id="statusArea" class="status" style="display: none;">
+            <p><span id="spinner" class="spinner" style="display: none;"></span> <span id="statusText"></span></p>
+        </div>
+        <p id="errorMessage" class="error" style="display: none;"></p>
+
+        <!-- File Selection Area (Initially Hidden) -->
+        <div id="filterArea" style="display: none;">
+             <hr>
+             <h4>Filter by file extensions/types:</h4>
+             <div id="extensionFilters">
+                 <span class="placeholder-text">Loading filters...</span>
+             </div>
+             <h4>Select files to include:</h4>
+             <div id="fileTreeContainer" class="file-tree">
+                 <span class="placeholder-text">Loading file list...</span>
+             </div>
+             <div class="tree-actions">
+                <button type="button" id="selectAllBtn">Select All Visible</button>
+                <button type="button" id="deselectAllBtn">Deselect All Visible</button>
+             </div>
+        </div>
+
+
+        <!-- Generation Area (Initially Hidden) -->
+        <div id="generationArea" style="display: none;">
+            <button type="button" id="generateTextBtn"> <i class="gg-poll"></i> Generate Text File</button>
+            <span id="tokenCountArea" style="margin-left: 15px; font-size: 0.9em; color: #555;"></span>
+        </div>
+
+        <!-- Result Preview & Actions Area (Initially Hidden) -->
+        <div id="resultContainer" style="display: none;">
+            <hr>
+            <h3>Preview and Output</h3>
+             <div id="outputPreview">
+                <label>Structure Preview:</label>
+                <pre><code id="structurePreview">(Structure will appear here)</code></pre>
+                <label>Content Preview:</label>
+                <pre><code id="contentPreview">(Content will appear here)</code></pre>
+             </div>
+             <div id="outputActions">
+                 <button type="button" id="copyBtn"> <i class="gg-copy"></i> Copy to Clipboard</button>
+                 <button type="button" id="downloadTxtBtn"> <i class="gg-software-download"></i> Download Text File</button>
+             </div>
+        </div>
     </div>
 
-    <!-- Result Preview & Actions Area (Initially Hidden) -->
-    <div id="resultContainer" style="display: none;">
-        <hr>
-        <h3>Preview and Output</h3>
-         <!-- 7. File Content Preview -->
-         <div id="outputPreview">
-            <label>Structure Preview:</label>
-            <pre><code id="structurePreview">(Structure will appear here)</code></pre> {/* For structure (6) */}
-            <label>Content Preview:</label>
-            <pre><code id="contentPreview">(Content will appear here)</code></pre> {/* For content */}
-         </div>
-         <!-- 8 & 9. Action Buttons -->
-         <div id="outputActions">
-             <button type="button" id="copyBtn"> <i class="gg-copy"></i> Copy to Clipboard</button>
-             <button type="button" id="downloadTxtBtn"> <i class="gg-software-download"></i> Download Text File</button>
-             <!-- 5. Download Zip Button (Placeholder for future - currently disabled) -->
-             <!-- <button type="button" id="downloadZipBtn" disabled title="Zip functionality not yet implemented">Download Zip</button> -->
-         </div>
-    </div>
-
-    <!-- Link JavaScript file -->
-    <script src="script.js"></script>
-    <!-- Optional: Add library for token counting if needed -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/gpt3-tokenizer@1.1.5/dist/gpt3-tokenizer.min.js"></script> -->
-    <!-- Optional: Add library for client-side zipping (for future Zip feature) -->
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> -->
+    <!-- Load SHA256 utility first, then password logic, then main app script -->
+    <script src="js/sha256.js"></script> 
+    <script src="js/password-config.js"></script> <!-- If you still have it, though likely not needed -->
+    <script src="js/password.js"></script>
+    <script src="script.js"></script> 
+    <!-- No gpt3-tokenizer or jszip needed based on previous review -->
 
 </body>
 </html>
