@@ -238,6 +238,18 @@ button i {
     /* background-color: #f0f0f0; */ /* Optional background for toggle */
     /* border-radius: 3px; */
 }
+
+/* Toggle icon display using CSS ::before pseudo-element */
+.file-tree .toggle.expanded::before {
+    content: '▼'; /* Down arrow for expanded state */
+}
+.file-tree .toggle.collapsed::before {
+    content: '▶'; /* Right arrow for collapsed state */
+}
+.file-tree .toggle.empty::before {
+    content: ' '; /* Empty space for toggle with no children */
+}
+
 .file-tree .toggle:hover {
     color: #000;
 }
