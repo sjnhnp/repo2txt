@@ -1,149 +1,400 @@
-// script.js (完整代码)
+// script.js (Overhauled)
 
-// 定义后端 API 的相对路径 (指向 /functions/api/generate.js)
-const API_ENDPOINT = '/api/generate';
+// --- DOM Elements ---
+const repoForm = document.getElementById('repoForm');
+const repoUrlInput = document.getElementById('repoUrl');
+const patInput = document.getElementById('patInput');
+const fetchStructureBtn = document.getElementById('fetchStructureBtn');
+const statusArea = document.getElementById('statusArea');
+const statusText = document.getElementById('statusText');
+const spinner = document.getElementById('spinner');
+const errorMessage = document.getElementById('errorMessage');
 
-// 获取页面上的 HTML 元素
-const repoForm = document.getElementById('repoForm'); // 表单
-const repoUrlInput = document.getElementById('repoUrl'); // 输入框
-const submitBtn = document.getElementById('submitBtn'); // 提交按钮
-const statusArea = document.getElementById('statusArea'); // 显示状态的区域
-const statusText = document.getElementById('statusText'); // 显示状态文本
-const spinner = document.getElementById('spinner'); // 加载动画
-const resultArea = document.getElementById('resultArea'); // 显示结果的区域
-const downloadLink = document.getElementById('downloadLink'); // 下载链接
-const errorMessage = document.getElementById('errorMessage'); // 显示错误信息
+const filterArea = document.getElementById('filterArea');
+const extensionFiltersContainer = document.getElementById('extensionFilters');
+const fileTreeContainer = document.getElementById('fileTreeContainer');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const deselectAllBtn = document.getElementById('deselectAllBtn');
 
-// --- 当用户提交表单时执行的函数 ---
-repoForm.addEventListener('submit', async (event) => {
-    // 1. 阻止表单的默认提交行为（防止页面刷新）
-    event.preventDefault();
+const generationArea = document.getElementById('generationArea');
+const generateTextBtn = document.getElementById('generateTextBtn');
+const tokenCountArea = document.getElementById('tokenCountArea');
 
-    // 2. 获取用户在输入框中输入的 GitHub 仓库 URL，并去除前后空格
+const resultContainer = document.getElementById('resultContainer');
+const structurePreview = document.getElementById('structurePreview');
+const contentPreview = document.getElementById('contentPreview');
+const outputActions = document.getElementById('outputActions');
+const copyBtn = document.getElementById('copyBtn');
+const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+
+// --- Global State ---
+let currentRepoUrl = null;
+let currentPat = null;
+let fileTreeData = []; // Stores the raw list of file objects { path: '...', sha: '...', ... } from backend
+let availableExtensions = new Set();
+let generatedContent = ""; // Store combined content for copy/download
+let generatedStructure = ""; // Store structure for copy/download
+let activeFilters = new Set(); // Store active extension filters
+
+// --- Constants ---
+const API_ENDPOINT = '/api/generate'; // Same Pages Function endpoint
+
+// --- Utility Functions ---
+function showStatus(message, showSpinner = false) {
+    statusArea.style.display = 'block';
+    statusText.textContent = message;
+    spinner.style.display = showSpinner ? 'inline-block' : 'none';
+    errorMessage.textContent = ''; // Clear previous errors
+}
+
+function showError(message) {
+    errorMessage.textContent = message;
+    statusArea.style.display = 'none'; // Hide status when showing error
+    // Hide subsequent sections on error
+    filterArea.style.display = 'none';
+    generationArea.style.display = 'none';
+    resultContainer.style.display = 'none';
+}
+
+function resetUI() {
+    statusArea.style.display = 'none';
+    errorMessage.textContent = '';
+    filterArea.style.display = 'none';
+    generationArea.style.display = 'none';
+    resultContainer.style.display = 'none';
+    fileTreeContainer.innerHTML = ''; // Clear tree
+    extensionFiltersContainer.innerHTML = ''; // Clear filters
+    fileTreeData = [];
+    availableExtensions = new Set();
+    activeFilters = new Set();
+    currentRepoUrl = null;
+    currentPat = null;
+     generatedContent = "";
+     generatedStructure = "";
+     repoUrlInput.value = ''; // Optionally clear input
+     patInput.value = '';
+     fetchStructureBtn.disabled = false;
+}
+
+// --- Core Logic ---
+
+// 1. Fetch Directory Structure
+fetchStructureBtn.addEventListener('click', async () => {
     const repoUrl = repoUrlInput.value.trim();
+    const pat = patInput.value.trim();
 
-    // 3. 检查 URL 是否为空
     if (!repoUrl) {
-        alert('Please enter a GitHub repository URL.'); // 提示用户输入
-        return; // 结束函数执行
+        showError('Please enter a GitHub repository URL.');
+        return;
     }
 
-    // --- 4. 更新界面，告知用户处理已开始 ---
-    submitBtn.disabled = true; // 禁用提交按钮，防止重复点击
-    spinner.style.display = 'inline-block'; // 显示加载动画
-    statusText.textContent = 'Processing request... (This might take a while for large repos)'; // 显示处理中信息
-    resultArea.style.display = 'none'; // 隐藏上一次的结果区域
-    errorMessage.textContent = ''; // 清空上一次的错误信息
-    downloadLink.style.display = 'inline-block'; // 确保下载链接初始可见（如果上次出错了会被隐藏）
-    // ---
-
-    // 5. 使用 try...catch...finally 来处理可能发生的错误
+    // Basic URL validation (optional but good)
     try {
-        // --- 6. 向后端 API 发送请求 ---
-        console.log(`Sending request to function: ${API_ENDPOINT}`); // 在浏览器控制台打印日志，方便调试
+        new URL(repoUrl);
+        if (!repoUrl.toLowerCase().includes('github.com')) throw new Error('Not a GitHub URL');
+    } catch (e) {
+         showError('Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo).');
+         return;
+    }
 
+
+    currentRepoUrl = repoUrl;
+    currentPat = pat || null; // Store PAT (or null if empty)
+    fetchStructureBtn.disabled = true;
+    showStatus('Fetching directory structure...', true);
+    filterArea.style.display = 'none'; // Hide previous tree/filters
+    generationArea.style.display = 'none';
+    resultContainer.style.display = 'none';
+
+    try {
         const response = await fetch(API_ENDPOINT, {
-            method: 'POST', // 使用 POST 方法
-            headers: {
-                'Content-Type': 'application/json', // 告诉后端我们发送的是 JSON 数据
-            },
-            // 将仓库 URL 包装成 JSON 字符串作为请求体发送
-            body: JSON.stringify({ repoUrl: repoUrl }),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                repoUrl: currentRepoUrl,
+                pat: currentPat, // Send PAT to backend
+                action: 'getTree'
+            })
         });
 
-        console.log('Function response status:', response.status); // 在控制台打印后端响应状态码
-
-        // --- 7. 处理后端的响应 ---
-        if (response.ok) {
-            // 7.1 如果响应状态码表示成功 (例如 200 OK)
-            console.log('Function returned success.');
-
-            // 获取响应体作为 Blob 对象 (二进制大对象)，适合处理文件下载
-            const blob = await response.blob();
-
-            // 为这个 Blob 创建一个临时的 URL，可以用在 <a> 标签的 href 上
-            const downloadUrl = URL.createObjectURL(blob);
-
-            // 尝试从响应头获取后端建议的文件名
-            const disposition = response.headers.get('content-disposition');
-            let filename = "repository_content.txt"; // 设置一个默认文件名
-            if (disposition && disposition.includes('attachment')) {
-                // 正则表达式尝试匹配 filename="some_name.txt"
-                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                const matches = filenameRegex.exec(disposition);
-                if (matches != null && matches[1]) {
-                  filename = matches[1].replace(/['"]/g, ''); // 去除可能存在的引号
-                }
-            }
-            console.log(`Suggested filename: ${filename}`);
-
-            // --- 更新界面，显示成功结果 ---
-            downloadLink.href = downloadUrl; // 设置下载链接的 URL
-            downloadLink.download = filename; // 设置点击链接时下载的文件名
-            resultArea.style.display = 'block'; // 显示结果区域
-            statusText.textContent = 'Processing complete!'; // 更新状态文本
-            // ---
-
-        } else {
-            // 7.2 如果响应状态码表示失败 (例如 400, 404, 500)
-            console.error('Function returned an error.');
-
-            // 尝试将响应体解析为 JSON，获取后端返回的错误信息
-            let errorData = null;
-            try {
-                errorData = await response.json();
-                 console.error('Error details:', errorData);
-            } catch (e) {
-                // 如果响应体不是有效的 JSON，记录原始文本
-                const errorText = await response.text();
-                console.error('Non-JSON error response:', errorText);
-            }
-
-
-            // --- 更新界面，显示错误信息 ---
-            // 优先使用 JSON 中的 error 字段，否则显示通用错误信息
-            errorMessage.textContent = `Error: ${errorData?.error || `Request failed with status ${response.status}`}`;
-            resultArea.style.display = 'block'; // 显示结果区域（为了展示错误信息）
-            downloadLink.style.display = 'none'; // 隐藏下载链接，因为没有成功的文件
-            statusText.textContent = 'Processing failed.'; // 更新状态文本
-            // ---
+        if (!response.ok) {
+             const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+             throw new Error(errorData.error || `Failed to fetch structure (Status: ${response.status})`);
         }
 
+        const data = await response.json();
+        fileTreeData = data.tree || []; // Expecting { tree: [...] }
+        console.log(`Received ${fileTreeData.length} files.`);
+
+        if (data.truncated) {
+             showStatus(`Fetched structure (Warning: File list may be incomplete due to large repository). Found ${fileTreeData.length} processable files.`, false);
+        } else if (fileTreeData.length === 0) {
+             showStatus('Fetched structure. No processable text files found matching default filters.', false);
+              // Display message, don't show tree/generate button
+              filterArea.style.display = 'none';
+              generationArea.style.display = 'none';
+              return; // Stop here
+        }
+         else {
+             showStatus(`Fetched structure. Found ${fileTreeData.length} processable files.`, false);
+        }
+
+
+        // Populate Filters and Tree
+        populateExtensionFilters(fileTreeData);
+        renderFileTree(fileTreeData); // Initial render with all files
+        filterArea.style.display = 'block';
+        generationArea.style.display = 'block'; // Show generate button
+        resultContainer.style.display = 'none'; // Hide previous results
+
     } catch (error) {
-        // --- 8. 处理网络错误或其他意外的前端 JavaScript 错误 ---
-        console.error('Fetch error or other script error:', error);
-
-        // --- 更新界面，显示捕获到的错误 ---
-        errorMessage.textContent = `An unexpected error occurred: ${error.message}`;
-        resultArea.style.display = 'block';
-        downloadLink.style.display = 'none';
-        statusText.textContent = 'An unexpected error occurred.';
-        // ---
-
+        console.error('Fetch Structure Error:', error);
+        showError(`Error fetching structure: ${error.message}`);
+         fileTreeData = []; // Clear data on error
     } finally {
-        // --- 9. 无论成功还是失败，最后都要执行的代码 ---
-        submitBtn.disabled = false; // 重新启用提交按钮
-        spinner.style.display = 'none'; // 隐藏加载动画
-        console.log('Request processing finished.');
-        // 注意：我们不在这里清除 statusText，让用户能看到最终的状态（成功或失败）
-        // ---
+        fetchStructureBtn.disabled = false;
+         // Ensure spinner is hidden even if status wasn't updated successfully
+         spinner.style.display = 'none';
     }
 });
 
-// --- 10. 为下载链接添加点击事件监听器，用于清理临时的 Blob URL ---
-downloadLink.addEventListener('click', () => {
-    // 使用 setTimeout 稍微延迟一下，确保浏览器有时间开始下载
-    setTimeout(() => {
-        // 检查 href 是否仍然是 blob: URL (用户可能右键复制链接等)
-        if (downloadLink.href.startsWith('blob:')) {
-            // 释放之前通过 URL.createObjectURL 创建的内存对象
-            URL.revokeObjectURL(downloadLink.href);
-            console.log('Revoked temporary blob URL:', downloadLink.href);
+// 2. Populate Extension Filters
+function populateExtensionFilters(files) {
+    availableExtensions.clear();
+    files.forEach(file => {
+        const parts = file.path.split('.');
+        if (parts.length > 1) {
+            const ext = '.' + parts.pop().toLowerCase();
+            availableExtensions.add(ext);
+        } else {
+             // Handle files with no extension? Maybe add a specific filter like "(no extension)"
+             // Or based on ALLOWED_EXTENSIONS check if filename itself matches like 'Dockerfile'
+             const filename = file.path.substring(file.path.lastIndexOf('/') + 1);
+             if (ALLOWED_EXTENSIONS.has(filename.toLowerCase())) {
+                 availableExtensions.add(filename); // Add filename itself as filter category
+             }
         }
-    }, 150); // 延迟 150 毫秒
+    });
 
-     // 点击下载链接后，可以考虑清除错误信息（如果之前有的话）
-    errorMessage.textContent = '';
-     // 确保链接再次可见（以防万一）
-    downloadLink.style.display = 'inline-block';
+    extensionFiltersContainer.innerHTML = ''; // Clear previous
+    activeFilters = new Set(availableExtensions); // Initially all are active
+
+    // Sort extensions for display
+    const sortedExtensions = Array.from(availableExtensions).sort();
+
+    sortedExtensions.forEach(ext => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = ext;
+        checkbox.checked = true; // Initially check all
+        checkbox.addEventListener('change', handleFilterChange);
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(ext));
+        extensionFiltersContainer.appendChild(label);
+    });
+}
+
+// 3. Handle Filter Change
+function handleFilterChange() {
+    activeFilters.clear();
+    const checkboxes = extensionFiltersContainer.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            activeFilters.add(cb.value);
+        }
+    });
+    // Re-render the tree with active filters
+    renderFileTree(fileTreeData);
+}
+
+
+// 4. Render File Tree (Needs Improvement for Hierarchy)
+// This version renders a flat list with checkboxes based on filters
+function renderFileTree(files) {
+    fileTreeContainer.innerHTML = ''; // Clear previous tree
+
+    const filteredFiles = files.filter(file => {
+        const parts = file.path.split('.');
+         let fileExtOrName = null;
+         if (parts.length > 1) {
+             fileExtOrName = '.' + parts.pop().toLowerCase();
+         } else {
+              const filename = file.path.substring(file.path.lastIndexOf('/') + 1);
+              if (ALLOWED_EXTENSIONS.has(filename.toLowerCase())) {
+                  fileExtOrName = filename; // Use filename if it's in allowed list (e.g., Dockerfile)
+              }
+         }
+        return fileExtOrName && activeFilters.has(fileExtOrName);
+    });
+
+    if (filteredFiles.length === 0) {
+        fileTreeContainer.innerHTML = '<li>No files match the current filters.</li>';
+        return;
+    }
+
+    const ul = document.createElement('ul');
+    filteredFiles.forEach(file => {
+        const li = document.createElement('li');
+        li.className = 'file'; // Mark as file node
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = file.path; // Use path as value
+        checkbox.checked = true; // Default check filtered files
+        checkbox.classList.add('file-tree-checkbox');
+
+        const nodeSpan = document.createElement('span');
+        nodeSpan.className = 'tree-node';
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'node-icon';
+        nodeSpan.appendChild(iconSpan); // Placeholder for icon
+
+        nodeSpan.appendChild(document.createTextNode(file.path)); // Display full path for now
+
+        li.appendChild(checkbox);
+        li.appendChild(nodeSpan);
+        ul.appendChild(li);
+    });
+    fileTreeContainer.appendChild(ul);
+
+    // Add event listener to parent container for delegation (optional optimization)
+}
+
+// --- Select/Deselect All ---
+selectAllBtn.addEventListener('click', () => {
+    const checkboxes = fileTreeContainer.querySelectorAll('.file-tree-checkbox');
+    checkboxes.forEach(cb => cb.checked = true);
 });
+
+deselectAllBtn.addEventListener('click', () => {
+    const checkboxes = fileTreeContainer.querySelectorAll('.file-tree-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+});
+
+
+// 5. Generate Text File Content
+generateTextBtn.addEventListener('click', async () => {
+    const selectedCheckboxes = fileTreeContainer.querySelectorAll('.file-tree-checkbox:checked');
+    const selectedFiles = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+    if (selectedFiles.length === 0) {
+        showError('Please select at least one file to generate the text.');
+        return;
+    }
+
+    console.log(`Generating text for ${selectedFiles.length} files.`);
+    generateTextBtn.disabled = true;
+    showStatus('Generating combined text content...', true);
+    resultContainer.style.display = 'none'; // Hide previous result
+
+    try {
+        const response = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                repoUrl: currentRepoUrl,
+                pat: currentPat,
+                action: 'generateText',
+                selectedFiles: selectedFiles // Send the list of selected paths
+            })
+        });
+
+         if (!response.ok) {
+             const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+             throw new Error(errorData.error || `Failed to generate text (Status: ${response.status})`);
+        }
+
+        const data = await response.json(); // Expecting { content: "...", structure: "..." }
+        generatedContent = data.content || "";
+        generatedStructure = data.structure || "";
+
+        // Display Preview (6 & 7)
+        structurePreview.textContent = generatedStructure;
+        contentPreview.textContent = generatedContent;
+        resultContainer.style.display = 'block';
+        showStatus(`Generated text from ${selectedFiles.length} files. Preview below.`, false);
+
+        // Optional: Calculate and display token count (Needs a tokenizer library)
+        // if (typeof GPT3Tokenizer !== 'undefined') {
+        //     const tokenizer = new GPT3Tokenizer({ type: 'gpt3' }); // or 'codex'
+        //     const encoded = tokenizer.encode(generatedContent);
+        //     tokenCountArea.textContent = `Approximate Token Count: ${encoded.bpe.length}`;
+        // } else {
+             tokenCountArea.textContent = '';
+        // }
+
+
+    } catch (error) {
+        console.error('Generate Text Error:', error);
+        showError(`Error generating text: ${error.message}`);
+    } finally {
+        generateTextBtn.disabled = false;
+        spinner.style.display = 'none'; // Ensure spinner is hidden
+    }
+});
+
+// 6. Copy to Clipboard (8)
+copyBtn.addEventListener('click', async () => {
+    const fullContentToCopy = `${generatedStructure}\n${generatedContent}`; // Combine structure and content
+    if (!navigator.clipboard) {
+        showError('Clipboard API not available in this browser.');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(fullContentToCopy);
+        copyBtn.textContent = 'Copied!'; // Provide feedback
+        setTimeout(() => { copyBtn.innerHTML = '<i class="gg-copy"></i> Copy to Clipboard'; }, 2000); // Reset button text
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+        showError('Failed to copy text to clipboard.');
+    }
+});
+
+// 7. Download Text File (9)
+downloadTxtBtn.addEventListener('click', () => {
+    if (!generatedContent && !generatedStructure) {
+        showError("No content generated to download.");
+        return;
+    }
+
+    const fullContentToDownload = `${generatedStructure}\n${generatedContent}`;
+    const blob = new Blob([fullContentToDownload], { type: 'text/plain;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+
+    // Create filename
+    let filename = "repository_content.txt";
+    if (currentRepoUrl) {
+        try {
+            const url = new URL(currentRepoUrl);
+            const pathParts = url.pathname.split('/').filter(Boolean);
+            if (pathParts.length >= 2) {
+                 const repoName = pathParts[1];
+                 // Try to get branch name (simple guess for now)
+                  let branch = 'main';
+                  if (pathParts.length >= 4 && pathParts[2] === 'tree') {
+                       branch = pathParts[3];
+                  }
+                 filename = `${repoName}_${branch}_content.txt`;
+            }
+        } catch (e) { /* Keep default filename */ }
+    }
+
+
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a); // Append anchor to body
+    a.click(); // Programmatically click the anchor to trigger download
+    document.body.removeChild(a); // Remove anchor from body
+    URL.revokeObjectURL(downloadUrl); // Clean up the object URL
+});
+
+
+// --- Initial Setup ---
+// Add any setup logic needed when the page loads
+// resetUI(); // Call reset on load? Or leave fields populated?
+
+// Add reference to tokenizer library ALLOWED_EXTENSIONS
+const ALLOWED_EXTENSIONS = new Set([ '.js', '.jsx', '.ts', '.tsx', '.json', '.css', '.scss', '.less', '.html', '.htm', '.xml', '.yaml', '.yml', '.md', '.markdown', '.txt', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.php', '.rb', '.swift', '.kt', '.kts', '.sh', '.bash', '.zsh', '.sql', '.dockerfile', 'dockerfile', '.env', '.gitignore', '.gitattributes', '.toml', '.ini', '.cfg', '.conf', '.properties', '.gradle', '.lua', '.rs']); // Keep this in sync with backend
