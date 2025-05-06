@@ -1,4 +1,12 @@
 // functions/_middleware.js
+const publicPaths = [
+    '/js/sha256.js',
+    '/js/password.js',
+    // '/js/password-config.js', // This is commented out in your HTML, so optional here
+    '/style.css',
+    '/favicon.ico',
+    '/script.js' // Add your main application script
+];
 
 const AUTH_COOKIE_NAME = 'repo2txt_auth_token';
 // 您需要在Cloudflare Pages的环境变量中设置 PASSWORD_HASH
