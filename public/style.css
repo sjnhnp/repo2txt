@@ -1,80 +1,71 @@
+/* style.css (Additions/Modifications) */
 body {
     font-family: sans-serif;
     line-height: 1.6;
-    margin: 0;
-    padding: 20px;
-    background-color: #f4f4f4;
-    color: #333;
+    margin: 20px;
 }
 
-.container {
-    max-width: 600px;
-    margin: 30px auto;
-    padding: 20px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+h1, h3, h4 {
+    margin-bottom: 10px;
 }
 
-h1 {
-    text-align: center;
-    color: #333;
+form label {
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
 }
 
-#repoForm {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+form input[type="text"],
+form input[type="password"] {
+    width: 95%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    max-width: 600px; /* Limit width */
 }
 
-#repoUrl {
-    flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-#submitBtn {
+form button, #outputActions button, #generationArea button, #filterArea button {
     padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
+    margin-top: 10px;
+    margin-right: 5px;
+    cursor: pointer;
     border: none;
     border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    background-color: #007bff;
+    color: white;
+    font-size: 1em;
 }
 
-#submitBtn:hover {
-    background-color: #0056b3;
-}
-
- #submitBtn:disabled {
+form button:disabled, #outputActions button:disabled, #generationArea button:disabled, #filterArea button:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
 }
 
-
-#statusArea {
-    text-align: center;
-    margin-bottom: 15px;
-    min-height: 40px; /* Reserve space */
+#fetchStructureBtn {
+    background-color: #17a2b8;
 }
 
-#statusText {
-    font-style: italic;
-    color: #555;
+#generateTextBtn {
+     background-color: #28a745; /* Green like image */
 }
+#copyBtn {
+    background-color: #6c757d; /* Grey */
+}
+#downloadTxtBtn {
+     background-color: #6f42c1; /* Purple like image */
+}
+
 
 .spinner {
     border: 4px solid #f3f3f3; /* Light grey */
-    border-top: 4px solid #3498db; /* Blue */
+    border-top: 4px solid #007bff; /* Blue */
     border-radius: 50%;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     animation: spin 1s linear infinite;
     display: inline-block;
+    margin-right: 5px;
     vertical-align: middle;
-    margin-left: 10px;
 }
 
 @keyframes spin {
@@ -82,28 +73,129 @@ h1 {
     100% { transform: rotate(360deg); }
 }
 
-#resultArea {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
-
-#downloadLink {
-    display: inline-block;
-    padding: 10px 15px;
-    background-color: #28a745;
-    color: white;
-    text-decoration: none;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
-
- #downloadLink:hover {
-    background-color: #218838;
+#statusArea {
+    margin-top: 15px;
+    font-weight: bold;
 }
 
 .error {
-    color: #dc3545;
+    color: red;
+    margin-top: 15px;
     font-weight: bold;
-    margin-top: 10px;
+}
+
+/* --- File Tree Styles (3) --- */
+#filterArea {
+    margin-top: 20px;
+    border: 1px solid #eee;
+    padding: 15px;
+    background-color: #f9f9f9;
+     max-width: 700px; /* Limit width */
+}
+#extensionFilters {
+    margin-bottom: 15px;
+}
+#extensionFilters label {
+    display: inline-block;
+    margin-right: 15px;
+    font-weight: normal;
+}
+
+.file-tree {
+    max-height: 400px; /* Limit height and add scroll */
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background-color: white;
+}
+
+.file-tree ul {
+    list-style-type: none;
+    padding-left: 20px; /* Indentation for levels */
+}
+
+.file-tree li {
+    margin-bottom: 3px;
+}
+
+.file-tree input[type="checkbox"] {
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.file-tree .tree-node { /* Span containing icon and name */
+     display: inline-block;
+     vertical-align: middle;
+     cursor: pointer; /* Make clickable to toggle children? (Advanced) */
+}
+
+.file-tree .node-icon {
+    display: inline-block;
+    width: 1em; /* Space for icon */
+    margin-right: 4px;
+}
+
+/* Basic icons using text/pseudo-elements */
+.file-tree .folder > .tree-node > .node-icon::before {
+    content: '📁'; /* Folder emoji */
+}
+.file-tree .file > .tree-node > .node-icon::before {
+     content: '📄'; /* File emoji */
+}
+/* Add more specific icons based on file extension if desired */
+
+
+/* --- Result Preview Styles (7) --- */
+#resultContainer {
+     margin-top: 20px;
+     border: 1px solid #eee;
+     padding: 15px;
+     background-color: #f9f9f9;
+}
+
+#outputPreview {
+    max-height: 500px;
+    overflow: auto;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+
+#outputPreview pre {
+    margin: 0;
+    white-space: pre-wrap; /* Wrap long lines */
+    word-wrap: break-word;
+}
+#outputPreview code {
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+#structurePreview {
+    color: #666; /* Lighter color for structure */
+    border-bottom: 1px dashed #ccc;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+}
+
+
+/* Add some icon styles if using a library like css.gg */
+/* Example for css.gg icons used in buttons */
+@import url('https://css.gg/css?=|copy|poll|search-loading|software-download');
+
+button i {
+    vertical-align: middle;
+    margin-right: 5px;
+}
+/* Fix gg-search-loading alignment if needed */
+button .gg-search-loading {
+  vertical-align: -2px;
+}
+
+/* Optional: Hide password input text */
+input[type="password"] {
+    font-family: text-security-disc; /* Basic hiding */
+    -webkit-text-security: disc;
+    -moz-text-security: disc;
 }
