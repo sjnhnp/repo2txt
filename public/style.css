@@ -357,4 +357,113 @@ button i {
     margin-top: 15px;
 }
 
-/* END OF style.css */
+/* --- Password Protection Styles --- */
+#password-container {
+    display: flex; /* Used to center the form */
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh; /* Take up most of the viewport height */
+    padding: 20px;
+}
+
+.auth-form-container {
+    background-color: #fff;
+    padding: 30px 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.auth-form-container h1 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.8em;
+    color: #333;
+}
+.auth-form-container h1 i {
+    vertical-align: -3px;
+    margin-right: 8px;
+    color: #007bff;
+}
+
+.auth-form-container p {
+    margin-bottom: 20px;
+    color: #555;
+}
+
+#password-form label {
+    display: block;
+    text-align: left;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+#password-form input[type="password"] {
+    width: calc(100% - 22px); /* Account for padding */
+    padding: 12px 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+#password-form button[type="submit"] {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 1.1em;
+    background-color: #007bff;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#password-form button[type="submit"]:hover {
+    background-color: #0056b3;
+}
+#password-form button[type="submit"]:disabled .spinner {
+    width: 18px; /* Adjust spinner size in button */
+    height: 18px;
+    border-width: 2px; /* Thinner border for button spinner */
+    margin-right: 10px;
+}
+
+
+#password-error-message {
+    margin-top: 15px;
+    /* .error class is already defined with red background/text */
+}
+
+/* --- App Header for Logout Button --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 1em; /* Add some space below the header */
+}
+
+.app-header h1 {
+    border-bottom: none; /* Remove duplicate border if h1 already has one */
+    margin-bottom: 0.3em; /* Align with original h1 padding */
+}
+
+#logoutBtn {
+    background-color: #dc3545; /* Red for logout */
+    padding: 8px 15px;
+    font-size: 0.9em;
+    margin-top: 0; /* Align with h1 */
+}
+#logoutBtn i {
+    margin-right: 5px;
+}
+
+/* Ensure spinner in button is styled correctly */
+#password-submit-btn .spinner {
+    border-top-color: #fff; /* White spinner on blue button */
+}
+
