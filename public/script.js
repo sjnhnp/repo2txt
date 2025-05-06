@@ -1,9 +1,9 @@
 // script.js
-// THIS IS THE COMPLETE CODE FOR THIS FILE - NO OMISSIONS - FIXED ReferenceErrors
+// THIS IS THE COMPLETE CODE FOR THIS FILE - NO OMISSIONS - FIXED SyntaxError on line 37
 
 // --- DOM Elements (VERIFIED COMPLETE LIST) ---
 const repoForm = document.getElementById('repoForm');
-const repoUrlInput = document.getElementById('repoUrl'); // Added missing declaration
+const repoUrlInput = document.getElementById('repoUrl');
 const patInput = document.getElementById('patInput');
 const fetchStructureBtn = document.getElementById('fetchStructureBtn');
 
@@ -13,14 +13,14 @@ const spinner = document.getElementById('spinner');
 const errorMessage = document.getElementById('errorMessage');
 
 const filterArea = document.getElementById('filterArea');
-const extensionFiltersContainer = document.getElementById('extensionFilters'); // Added missing declaration
+const extensionFiltersContainer = document.getElementById('extensionFilters');
 const fileTreeContainer = document.getElementById('fileTreeContainer');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const deselectAllBtn = document.getElementById('deselectAllBtn');
 
 const generationArea = document.getElementById('generationArea');
 const generateTextBtn = document.getElementById('generateTextBtn');
-const tokenCountArea = document.getElementById('tokenCountArea'); // Optional token count display
+const tokenCountArea = document.getElementById('tokenCountArea');
 
 const resultContainer = document.getElementById('resultContainer');
 const structurePreview = document.getElementById('structurePreview');
@@ -34,7 +34,7 @@ const downloadTxtBtn = document.getElementById('downloadTxtBtn');
 let currentRepoUrl = null;
 let currentPat = null;
 let fileTreeData = []; // Stores the raw list including { type: 'tree'/'blob', path: '...' }
-let window.fileHierarchy = null; // Stores the built hierarchy object globally
+let fileHierarchy = null; // CORRECTED: Stores the built hierarchy object globally (Removed 'window.')
 let availableExtensions = new Set(); // All extensions/types found in fetched files
 let activeFilters = new Set(); // Currently selected filters
 let generatedContent = ""; // Store combined content for copy/download
@@ -82,20 +82,23 @@ function resetSubsequentSections() {
     generationArea.style.display = 'none';
     resultContainer.style.display = 'none';
     // Update placeholder text for the tree
-    fileTreeContainer.innerHTML = '<div class="placeholder-text">Enter URL and fetch structure to see the file tree.</div>';
+    if (fileTreeContainer) { // Check if element exists before accessing
+        fileTreeContainer.innerHTML = '<div class="placeholder-text">Enter URL and fetch structure to see the file tree.</div>';
+    }
     // Ensure extensionFiltersContainer exists before trying to set innerHTML
     if (extensionFiltersContainer) {
          extensionFiltersContainer.innerHTML = '<span class="placeholder-text">Filters appear after fetching.</span>';
     }
-    structurePreview.textContent = '(Structure will appear here)';
-    contentPreview.textContent = '(Content will appear here)';
+    if (structurePreview) structurePreview.textContent = '(Structure will appear here)';
+    if (contentPreview) contentPreview.textContent = '(Content will appear here)';
+
     fileTreeData = [];
-    window.fileHierarchy = null; // Reset hierarchy
+    fileHierarchy = null; // Reset hierarchy
     availableExtensions = new Set();
     activeFilters = new Set();
     generatedContent = "";
     generatedStructure = "";
-    tokenCountArea.textContent = ''; // Clear token count
+    if (tokenCountArea) tokenCountArea.textContent = ''; // Clear token count
 }
 
 
@@ -110,7 +113,7 @@ fetchStructureBtn.addEventListener('click', async () => {
         return;
     }
     const repoUrl = repoUrlInput.value.trim();
-    const pat = patInput ? patInput.value.trim() : null; // Handle case where patInput might be missing
+    const pat = patInput ? patInput.value.trim() : null;
 
     if (!repoUrl) {
         showError('Please enter a GitHub repository URL.');
@@ -125,7 +128,7 @@ fetchStructureBtn.addEventListener('click', async () => {
     currentPat = pat || null;
     fetchStructureBtn.disabled = true;
     showStatus('Fetching directory structure...', true);
-    resetSubsequentSections(); // Clear previous results/tree
+    resetSubsequentSections();
 
     try {
         console.log(`Fetching tree for ${currentRepoUrl} with${currentPat ? '' : 'out'} PAT.`);
@@ -158,9 +161,7 @@ fetchStructureBtn.addEventListener('click', async () => {
 
 
         if (fileTreeData.length > 0) {
-            // Pass only blobs to populateExtensionFilters
             populateExtensionFilters(fileTreeData.filter(item => item.type === 'blob'));
-            // Render the interactive file tree using ALL items
             renderFileTree(fileTreeData);
             filterArea.style.display = 'block';
             generationArea.style.display = 'block';
@@ -235,7 +236,6 @@ function handleFilterChange() {
             activeFilters.add(cb.value);
         }
     });
-    // Re-render the entire file tree based on the new active filters for files
     renderFileTree(fileTreeData); // Re-render with original full data
 }
 
@@ -252,13 +252,10 @@ function renderFileTree(items) {
     function buildHierarchy(itemList) {
         const hierarchy = { name: 'root', path: '', type: 'tree', children: {}, isVisibleBasedOnFilters: true }; // Root node
 
-        // Sort items by path depth first, then alphabetically for consistent parent creation
         itemList.sort((a, b) => {
              const depthA = a.path.split('/').length;
              const depthB = b.path.split('/').length;
-             if (depthA !== depthB) {
-                 return depthA - depthB;
-             }
+             if (depthA !== depthB) { return depthA - depthB; }
              return a.path.localeCompare(b.path);
          })
         .forEach(item => {
@@ -270,28 +267,21 @@ function renderFileTree(items) {
                 const isLastPart = index === pathParts.length - 1;
 
                 if (!currentLevel.children[part]) {
-                     // Create node if it doesn't exist
                      currentLevel.children[part] = {
-                         name: part,
-                         path: currentPath, // Full path to this node
-                         type: isLastPart ? item.type : 'tree', // Assume 'tree' unless it's the last part matching the item
-                         children: {},
-                         element: null, // Will hold the LI element
-                         checkbox: null, // Will hold the checkbox element
-                         isVisibleBasedOnFilters: false, // Default to not visible until checked
-                         originalItem: isLastPart ? item : null // Store original item only for the actual node
+                         name: part, path: currentPath,
+                         type: isLastPart ? item.type : 'tree',
+                         children: {}, element: null, checkbox: null,
+                         isVisibleBasedOnFilters: false,
+                         originalItem: isLastPart ? item : null
                      };
                  } else if (isLastPart) {
-                     // If node exists and this is the last part, update its type and originalItem
                      currentLevel.children[part].type = item.type;
                      currentLevel.children[part].originalItem = item;
                  }
-
-                 // Move down the hierarchy for the next part
                  currentLevel = currentLevel.children[part];
             });
         });
-        return hierarchy; // Return the root
+        return hierarchy;
     }
 
      // --- Helper: Should Item Be Visible Based on Filters? ---
@@ -310,7 +300,6 @@ function renderFileTree(items) {
              }
              return filterKey && activeFilters.has(filterKey);
          }
-         // Directories are not directly visible based on *file* filters
          return false;
      }
 
@@ -319,14 +308,13 @@ function renderFileTree(items) {
          if (node.type === 'blob') {
              node.isVisibleBasedOnFilters = isDirectlyVisible(node);
              return node.isVisibleBasedOnFilters;
-         } else { // It's a directory ('tree' or the root)
+         } else { // Directory or root
              let hasVisibleChild = false;
              Object.values(node.children).forEach(child => {
                  if (applyVisibility(child)) { // Recurse first
                      hasVisibleChild = true;
                  }
              });
-             // A directory is visible if it contains any visible children
              node.isVisibleBasedOnFilters = hasVisibleChild;
              return hasVisibleChild;
          }
@@ -334,31 +322,27 @@ function renderFileTree(items) {
 
     // --- Helper: Render the actual HTML Tree ---
     function renderNode(node, parentUl, isRootLevel = false) {
-        if (!node.isVisibleBasedOnFilters && !isRootLevel) { // Only render visible nodes (skip root check)
-            return;
-        }
+        if (!node.isVisibleBasedOnFilters && !isRootLevel) { return; }
 
         const li = document.createElement('li');
-        li.className = node.type; // Add 'tree' or 'blob' class
+        li.className = node.type;
         if (!node.isVisibleBasedOnFilters && node.type === 'tree') {
-             li.classList.add('filtered-out-dir'); // Optional: style directories differently if they only contain filtered items
+             li.classList.add('filtered-out-dir');
         }
-        node.element = li; // Store element reference
+        node.element = li;
 
         const nodeContent = document.createElement('div');
         nodeContent.className = 'node-content';
 
-        // Add toggle button for directories with children
         const hasRenderableChildren = Object.values(node.children).some(child => child.isVisibleBasedOnFilters);
         if (node.type === 'tree' && Object.keys(node.children).length > 0) {
             const toggle = document.createElement('span');
-            toggle.className = 'toggle expanded'; // Start expanded
+            toggle.className = 'toggle expanded';
             toggle.textContent = '▼';
-             // Only make toggle clickable if there are visible children to show/hide
             if (hasRenderableChildren) {
                  toggle.onclick = (e) => {
                     e.stopPropagation();
-                    const subUl = li.querySelector(':scope > ul'); // Select direct child UL
+                    const subUl = li.querySelector(':scope > ul');
                     if (subUl) {
                         const isExpanded = subUl.style.display !== 'none';
                         subUl.style.display = isExpanded ? 'none' : 'block';
@@ -368,12 +352,11 @@ function renderFileTree(items) {
                     }
                  };
              } else {
-                 toggle.classList.add('empty'); // Mark as empty for styling
-                 toggle.textContent = ' '; // Can use empty or a different symbol
+                 toggle.classList.add('empty');
+                 toggle.textContent = ' ';
              }
             nodeContent.appendChild(toggle);
         } else {
-            // Add placeholder for alignment if not a directory or is empty blob
             const placeholder = document.createElement('span');
             placeholder.className = 'toggle-placeholder';
             nodeContent.appendChild(placeholder);
@@ -381,13 +364,12 @@ function renderFileTree(items) {
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.value = node.path; // Path used as value
-        checkbox.checked = node.type === 'blob' ? node.isVisibleBasedOnFilters : false; // Check files if visible, default dirs unchecked
+        checkbox.value = node.path;
+        // Check files if they are visible, leave directories unchecked initially
+        checkbox.checked = node.type === 'blob' && node.isVisibleBasedOnFilters;
         checkbox.className = 'file-tree-checkbox';
-        checkbox.id = `cb-${node.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`; // Create safe ID
-        // Disable checkbox for directories that have no visible children? Maybe not, allow selecting structure.
-        // checkbox.disabled = node.type === 'tree' && !hasRenderableChildren;
-        node.checkbox = checkbox; // Store checkbox reference
+        checkbox.id = `cb-${node.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+        node.checkbox = checkbox;
         nodeContent.appendChild(checkbox);
 
         const label = document.createElement('label');
@@ -395,7 +377,7 @@ function renderFileTree(items) {
 
         const icon = document.createElement('span');
         icon.className = 'node-icon';
-        icon.textContent = node.type === 'tree' ? '📁' : '📄'; // Basic icons
+        icon.textContent = node.type === 'tree' ? '📁' : '📄';
         label.appendChild(icon);
 
         label.appendChild(document.createTextNode(` ${node.name || '.'}`));
@@ -403,56 +385,48 @@ function renderFileTree(items) {
 
         li.appendChild(nodeContent);
 
-        // If it's a directory and has potentially visible children, create a sub-UL and recurse
         if (node.type === 'tree' && Object.keys(node.children).length > 0) {
             const subUl = document.createElement('ul');
             Object.values(node.children)
                 .sort((a, b) => {
-                     // Sort directories first, then files, then alphabetically
                      if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
                      return a.name.localeCompare(b.name);
                  })
-                .forEach(child => renderNode(child, subUl)); // Recurse
+                .forEach(child => renderNode(child, subUl));
 
-            // Only append the sub-UL if it actually contains list items (rendered nodes)
             if (subUl.children.length > 0) {
                li.appendChild(subUl);
-            } else if (li.classList.contains('filtered-out-dir')) {
-                // Optional: Maybe hide the LI completely if dir has no renderable children AND was filtered out itself
-                // li.style.display = 'none';
+               // Ensure subUl is visible initially if toggle is expanded
+               subUl.style.display = 'block';
             }
         }
-
         parentUl.appendChild(li);
     }
 
     // --- Main Tree Rendering Steps ---
     const hierarchy = buildHierarchy(items);
-    window.fileHierarchy = hierarchy; // Store globally AFTER building
-    applyVisibility(hierarchy); // Apply visibility recursively
+    fileHierarchy = hierarchy; // Store globally AFTER building
+    applyVisibility(hierarchy);
 
     const rootUl = document.createElement('ul');
     rootUl.className = 'file-tree-root';
 
-    // Check if root has any visible children before rendering
     const rootHasVisibleContent = Object.values(hierarchy.children).some(child => child.isVisibleBasedOnFilters);
 
-    if (!rootHasVisibleContent && items.length > 0) { // Items exist, but none match filter
+    if (!rootHasVisibleContent && items.length > 0) {
          fileTreeContainer.innerHTML = '<div class="placeholder-text">No files match the current filters.</div>';
          return;
-    } else if (items.length === 0) { // No items fetched at all
+    } else if (items.length === 0) {
          fileTreeContainer.innerHTML = '<div class="placeholder-text">No files or directories found in the repository.</div>';
          return;
     }
 
-
-    // Render starting from the children of the virtual root
     Object.values(hierarchy.children)
            .sort((a, b) => {
              if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
              return a.name.localeCompare(b.name);
             })
-           .forEach(node => renderNode(node, rootUl, true)); // Pass true for root level
+           .forEach(node => renderNode(node, rootUl, true));
 
     fileTreeContainer.appendChild(rootUl);
 
@@ -460,7 +434,7 @@ function renderFileTree(items) {
     const allCheckboxes = fileTreeContainer.querySelectorAll('.file-tree-checkbox');
     allCheckboxes.forEach(cb => {
         cb.addEventListener('change', () => {
-            const node = findNodeByPath(window.fileHierarchy, cb.value);
+            const node = findNodeByPath(fileHierarchy, cb.value);
             if (node) {
                 updateCheckStatus(node, cb.checked);
             }
@@ -468,7 +442,7 @@ function renderFileTree(items) {
     });
 
     // Initialize parent states after initial render
-    initializeCheckboxStates(window.fileHierarchy);
+    initializeCheckboxStates(fileHierarchy);
 }
 
 
@@ -482,32 +456,26 @@ function findNodeByPath(root, path) {
         if (currentLevel && currentLevel.children && currentLevel.children[part]) {
             currentLevel = currentLevel.children[part];
         } else {
-            return null; // Path segment not found
+            return null;
         }
     }
-    return currentLevel; // Node found
+    return currentLevel;
 }
-
 
 // Update checkbox states downwards and upwards
 function updateCheckStatus(node, checked) {
-    if (!node || !node.checkbox || node.checkbox.disabled) return; // Ignore if no node/checkbox or disabled
+    if (!node || !node.checkbox || node.checkbox.disabled) return;
 
-    // Update self (if not already correct)
     node.checkbox.checked = checked;
     node.checkbox.indeterminate = false;
 
-    // Update children recursively (if directory)
     if (node.type === 'tree') {
         Object.values(node.children).forEach(child => {
-             // Only update children that are visible based on filters
-             if (child.isVisibleBasedOnFilters) {
+             if (child.isVisibleBasedOnFilters) { // Only update visible children
                   updateCheckStatus(child, checked);
              }
         });
     }
-
-    // Update parents recursively
     updateParentCheckbox(node);
 }
 
@@ -517,16 +485,15 @@ function updateParentCheckbox(node) {
     if (pathParts.length <= 1) return; // Root item, no parent
 
     const parentPath = pathParts.slice(0, -1).join('/');
-    const parentNode = findNodeByPath(window.fileHierarchy, parentPath);
+    const parentNode = findNodeByPath(fileHierarchy, parentPath);
 
-    if (!parentNode || !parentNode.checkbox || parentNode.checkbox.disabled) return; // No parent node or checkbox
+    if (!parentNode || !parentNode.checkbox || parentNode.checkbox.disabled) return;
 
     let allChildrenChecked = true;
     let someChildrenChecked = false;
     let hasVisibleChildren = false;
 
     Object.values(parentNode.children).forEach(child => {
-         // Consider only visible children
          if (child.isVisibleBasedOnFilters && child.checkbox) {
              hasVisibleChildren = true;
              if (!child.checkbox.checked && !child.checkbox.indeterminate) {
@@ -538,60 +505,46 @@ function updateParentCheckbox(node) {
          }
     });
 
-     // Determine parent state
-     if (!hasVisibleChildren) { // Should not happen if parent is rendered, but safety check
+     if (!hasVisibleChildren) {
         parentNode.checkbox.checked = false;
         parentNode.checkbox.indeterminate = false;
      } else if (allChildrenChecked) {
         parentNode.checkbox.checked = true;
         parentNode.checkbox.indeterminate = false;
     } else if (someChildrenChecked) {
-        parentNode.checkbox.checked = false; // Uncheck parent...
-        parentNode.checkbox.indeterminate = true; // ...but mark as indeterminate
-    } else { // No children checked or indeterminate
+        parentNode.checkbox.checked = false;
+        parentNode.checkbox.indeterminate = true;
+    } else {
         parentNode.checkbox.checked = false;
         parentNode.checkbox.indeterminate = false;
     }
-
-    // Recurse up to the next parent
-    updateParentCheckbox(parentNode);
+    updateParentCheckbox(parentNode); // Recurse upwards
 }
 
-// Initialize checkbox states after rendering (needed for indeterminate dirs)
+// Initialize checkbox states after rendering (post-order traversal)
 function initializeCheckboxStates(node) {
     if (!node) return;
     let allChecked = true;
     let someChecked = false;
     let hasVisibleChildren = false;
 
-    // Recurse to children first (post-order)
     if (node.type === 'tree') {
         Object.values(node.children).forEach(child => {
              if(child.isVisibleBasedOnFilters) {
                  hasVisibleChildren = true;
                  initializeCheckboxStates(child); // Recurse first
-                 // After child is initialized, check its state
                  if (child.checkbox) {
-                     if (!child.checkbox.checked && !child.checkbox.indeterminate) {
-                         allChecked = false;
-                     }
-                     if (child.checkbox.checked || child.checkbox.indeterminate) {
-                         someChecked = true;
-                     }
-                 } else {
-                      allChecked = false; // If a visible child has no checkbox, parent can't be fully checked
-                 }
+                     if (!child.checkbox.checked && !child.checkbox.indeterminate) { allChecked = false; }
+                     if (child.checkbox.checked || child.checkbox.indeterminate) { someChecked = true; }
+                 } else { allChecked = false; } // Should not happen for visible node, but safe check
              }
         });
     }
 
-    // Now update the current node's checkbox based on children states
     if (node.type === 'tree' && node.checkbox && !node.checkbox.disabled) {
-         if (!hasVisibleChildren) { // No visible children
+         if (!hasVisibleChildren) {
              node.checkbox.checked = false;
              node.checkbox.indeterminate = false;
-             // Optionally disable checkbox if dir is empty after filtering
-             // node.checkbox.disabled = true;
          } else if (allChecked) {
             node.checkbox.checked = true;
             node.checkbox.indeterminate = false;
@@ -603,27 +556,27 @@ function initializeCheckboxStates(node) {
             node.checkbox.indeterminate = false;
         }
     }
-     // Base case: file checkboxes are already set correctly during render based on isVisibleBasedOnFilters
+    // File checkboxes are initialized during renderNode based on visibility
 }
 
 
 // --- Select/Deselect All Visible Files ---
 selectAllBtn.addEventListener('click', () => {
-    if (!window.fileHierarchy) return;
-    // Iterate through hierarchy instead of querying DOM for better logic control
+    if (!fileHierarchy) return;
     function setCheckRecursively(node, checked) {
         if (!node.isVisibleBasedOnFilters || !node.checkbox || node.checkbox.disabled) return;
+        // Set state directly without triggering individual updates for performance
         node.checkbox.checked = checked;
         node.checkbox.indeterminate = false;
         if (node.type === 'tree') {
             Object.values(node.children).forEach(child => setCheckRecursively(child, checked));
         }
     }
-    Object.values(window.fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, true));
+    Object.values(fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, true));
 });
 
 deselectAllBtn.addEventListener('click', () => {
-    if (!window.fileHierarchy) return;
+    if (!fileHierarchy) return;
      function setCheckRecursively(node, checked) {
          if (!node.isVisibleBasedOnFilters || !node.checkbox || node.checkbox.disabled) return;
          node.checkbox.checked = checked;
@@ -632,36 +585,29 @@ deselectAllBtn.addEventListener('click', () => {
              Object.values(node.children).forEach(child => setCheckRecursively(child, checked));
          }
      }
-    Object.values(window.fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, false));
+    Object.values(fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, false));
 });
 
 
 // 5. Generate Text File Content Button Click
 generateTextBtn.addEventListener('click', async () => {
     const selectedFiles = [];
-    if (!window.fileHierarchy) {
+    if (!fileHierarchy) {
         showError("File tree data is not available.");
         return;
     }
 
-    // Helper to collect checked files from the hierarchy
     function collectCheckedFiles(node) {
-        if (!node.isVisibleBasedOnFilters) return; // Skip non-visible branches/files
-
+        if (!node.isVisibleBasedOnFilters) return;
         if (node.type === 'blob' && node.checkbox && node.checkbox.checked) {
             selectedFiles.push(node.path);
         } else if (node.type === 'tree' && node.children) {
-             // Recurse only if directory is checked or indeterminate
              if(node.checkbox && (node.checkbox.checked || node.checkbox.indeterminate)) {
                 Object.values(node.children).forEach(collectCheckedFiles);
              }
         }
     }
-
-    // Start collection from root's children
-    Object.values(window.fileHierarchy.children).forEach(collectCheckedFiles);
-
-    // Deduplicate just in case (shouldn't be necessary with correct logic, but safe)
+    Object.values(fileHierarchy.children).forEach(collectCheckedFiles);
     const uniqueSelectedFiles = [...new Set(selectedFiles)];
 
     if (uniqueSelectedFiles.length === 0) {
@@ -676,7 +622,6 @@ generateTextBtn.addEventListener('click', async () => {
     resultContainer.style.display = 'none';
 
     try {
-        // Fetch call remains the same
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -684,7 +629,7 @@ generateTextBtn.addEventListener('click', async () => {
                 repoUrl: currentRepoUrl,
                 pat: currentPat,
                 action: 'generateText',
-                selectedFiles: uniqueSelectedFiles // Send the collected file paths
+                selectedFiles: uniqueSelectedFiles
             })
         });
 
@@ -696,9 +641,8 @@ generateTextBtn.addEventListener('click', async () => {
 
         const data = await response.json();
         generatedContent = data.content || "";
-        generatedStructure = data.structure || ""; // Now contains the text tree
+        generatedStructure = data.structure || "";
 
-        // Display Preview
         structurePreview.textContent = generatedStructure || "(No structure generated)";
         contentPreview.textContent = generatedContent || "(No content generated or files skipped)";
         resultContainer.style.display = 'block';
@@ -720,7 +664,7 @@ generateTextBtn.addEventListener('click', async () => {
 // 6. Copy to Clipboard Button Click
 copyBtn.addEventListener('click', async () => {
     const fullContentToCopy = `${generatedStructure}\n${generatedContent}`;
-    if (!fullContentToCopy || fullContentToCopy.trim() === "\n") { // Check if effectively empty
+    if (!fullContentToCopy || fullContentToCopy.trim() === "\n") {
         showError("Nothing to copy.");
         return;
     }
@@ -759,8 +703,7 @@ downloadTxtBtn.addEventListener('click', () => {
             const url = new URL(currentRepoUrl);
             const pathParts = url.pathname.split('/').filter(Boolean);
             if (pathParts.length >= 2) {
-                 const owner = pathParts[0];
-                 const repoName = pathParts[1];
+                 const owner = pathParts[0]; const repoName = pathParts[1];
                  let branch = 'main';
                  if (pathParts.length >= 4 && pathParts[2] === 'tree') { branch = pathParts[3]; }
                  const safeRepoName = repoName.replace(/[^a-z0-9_-]/gi, '_');
@@ -786,22 +729,27 @@ downloadTxtBtn.addEventListener('click', () => {
 
 // Optional: Token Counting Function (Requires gpt-3-tokenizer library)
 function calculateAndDisplayTokenCount(text) {
-     // Check if the tokenizer library is loaded (assuming it's loaded globally)
-     // Example using hypothetical 'GPT3Tokenizer' class
      if (typeof GPT3Tokenizer !== 'undefined') {
          try {
-            const tokenizer = new GPT3Tokenizer({ type: 'gpt3' }); // or 'codex'
+            // NOTE: Ensure the tokenizer library is actually loaded in your index.html
+            const tokenizer = new GPT3Tokenizer({ type: 'gpt3' });
             const encoded = tokenizer.encode(text);
-            tokenCountArea.textContent = `Approx. Token Count: ${encoded.bpe.length}`;
-            tokenCountArea.style.display = 'inline';
+            if (tokenCountArea) { // Check if element exists
+                 tokenCountArea.textContent = `Approx. Token Count: ${encoded.bpe.length}`;
+                 tokenCountArea.style.display = 'inline';
+            }
          } catch (e) {
               console.error("Token calculation failed:", e);
-              tokenCountArea.textContent = '';
-              tokenCountArea.style.display = 'none';
+              if (tokenCountArea) {
+                   tokenCountArea.textContent = '';
+                   tokenCountArea.style.display = 'none';
+              }
          }
      } else {
-         tokenCountArea.textContent = '';
-         tokenCountArea.style.display = 'none';
+         if (tokenCountArea) {
+             tokenCountArea.textContent = '';
+             tokenCountArea.style.display = 'none';
+         }
          // console.log("GPT3Tokenizer library not found. Skipping token count.");
      }
 }
@@ -809,15 +757,16 @@ function calculateAndDisplayTokenCount(text) {
 
 // --- Initial Setup ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Repo2Txt Enhanced (Tree View - Fixed) Initialized");
-    // Perform initial reset only if elements are found
-    if(repoForm && fileTreeContainer && extensionFiltersContainer) {
+    console.log("Repo2Txt Enhanced (Tree View - Fixed SyntaxError) Initialized");
+    // Check essential elements before proceeding
+    if(repoForm && fileTreeContainer && extensionFiltersContainer && structurePreview && contentPreview) {
         resetSubsequentSections();
         hideStatusAndError();
     } else {
-         console.error("Initial setup failed: Essential DOM elements not found.");
-         // Optionally display a critical error to the user on the page itself
-         document.body.innerHTML = '<p style="color: red; font-weight: bold;">Error: Application failed to initialize. Essential page elements are missing.</p>';
+         console.error("Initial setup failed: Essential DOM elements not found. Check HTML structure and element IDs.");
+         // Display a user-facing error if critical elements are missing
+         document.body.innerHTML = '<p style="color: red; font-weight: bold; margin: 20px;">Error: Application failed to initialize correctly. Please check the console for details.</p>';
     }
 });
 // END OF script.js
+
