@@ -222,7 +222,7 @@ function isDirectlyVisible(item) {
         // 如果找到了匹配的 filterKey，并且该 key 在当前激活的过滤器集合中，则可见
         return filterKey && activeFilters.has(filterKey);
     }
-    return false; // 目录本身不直接参与“可见性”判断，其可见性取决于子节点
+    return false; // 目录本身不直接参与"可见性"判断，其可见性取决于子节点
 }
 
 // 递归地为文件树中的每个节点应用可见性标记
@@ -268,7 +268,6 @@ function renderNode(node, parentUl, isRootLevel = false) {
     if (node.type === 'tree' && Object.keys(node.children).length > 0) {
         const toggle = document.createElement('span');
         toggle.className = 'toggle expanded'; // 默认展开
-        toggle.textContent = '▼'; // 展开状态图标
 
         if (hasRenderableChildren) { // 只有当有可见子节点时，图标才可点击
             toggle.onclick = (e) => {
@@ -277,14 +276,12 @@ function renderNode(node, parentUl, isRootLevel = false) {
                 if (subUl) {
                     const isExpanded = subUl.style.display !== 'none'; // 判断当前是否展开
                     subUl.style.display = isExpanded ? 'none' : 'block'; // 切换显示状态
-                    toggle.textContent = isExpanded ? '▶' : '▼'; // 切换图标
                     toggle.classList.toggle('expanded', !isExpanded); // 切换 CSS 类
                     toggle.classList.toggle('collapsed', isExpanded);
                 }
             };
         } else { // 如果目录没有可见子节点，显示一个不可点击的占位符或禁用状态
             toggle.classList.add('empty'); // 添加 'empty' 类用于样式
-            toggle.textContent = ' '; // 使用空格或特定字符表示空/不可操作
         }
         nodeContent.appendChild(toggle); // 将图标添加到节点内容容器
     } else {
@@ -305,7 +302,7 @@ function renderNode(node, parentUl, isRootLevel = false) {
     checkbox.id = `cb-${node.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     node.checkbox = checkbox; // 在节点数据中保存对其复选框的引用
     nodeContent.appendChild(checkbox); // 添加到节点内容容器
-
+    
     // 创建标签 (Label)，关联到复选框，并包含图标和名称
     const label = document.createElement('label');
     label.htmlFor = checkbox.id; // 关联到复选框 ID，点击标签也能触​​发复选框
@@ -398,11 +395,11 @@ function updateParentCheckbox(node) {
         // 只考虑当前可见的子节点
         if (child.isVisibleBasedOnFilters && child.checkbox) {
             hasVisibleChildren = true; // 确实有可见子节点
-            // 如果有一个可见子节点未选中且不是不确定状态，则不能算“全部选中”
+            // 如果有一个可见子节点未选中且不是不确定状态，则不能算"全部选中"
             if (!child.checkbox.checked && !child.checkbox.indeterminate) {
                 allChildrenChecked = false;
             }
-            // 如果有一个可见子节点被选中或是父节点（处于不确定状态），则算“部分选中”
+            // 如果有一个可见子节点被选中或是父节点（处于不确定状态），则算"部分选中"
             if (child.checkbox.checked || child.checkbox.indeterminate) {
                 someChildrenChecked = true;
             }
@@ -845,7 +842,6 @@ if (generateTextBtn) {
 
         } catch (error) {
             console.error('生成文本时出错:', error);
-            // 在这里捕获到 calculateAndDisplayTokenCount is not defined 错误，因为函数未定义
             showError(`生成文本时出错: ${error.message}`);
             if (resultContainer) resultContainer.style.display = 'none';
         } finally {
@@ -858,161 +854,120 @@ if (generateTextBtn) {
     console.warn("Warning: generateTextBtn element not found. 'Generate Text' functionality will not work.");
 }
 
+// --- 复制和下载按钮事件处理 ---
 
-// --- 可选：Token 计数函数 (需要 gpt-3-tokenizer 库) ---
-// !!! 这就是之前缺失的函数定义 !!!
-function calculateAndDisplayTokenCount(text) {
-     // 检查 gpt-3-tokenizer 库是否已在页面中加载 (通过检查全局变量 GPT3Tokenizer 是否存在)
-     if (typeof GPT3Tokenizer !== 'undefined') {
-         try {
-            // 注意：你需要确保在 index.html 文件中通过 <script> 标签引入了 gpt-3-tokenizer 库
-            // 例如: <script src="https://cdn.jsdelivr.net/npm/gpt3-tokenizer@1.1.5/dist/gpt3-tokenizer.min.js"></script>
-            // 创建一个 tokenizer 实例 (类型 'gpt3' 通常适用性较广)
-            const tokenizer = new GPT3Tokenizer({ type: 'gpt3' });
-            // 对文本进行编码 (分词)
-            const encoded = tokenizer.encode(text);
-            // 获取 token 数量 (通常是 BPE 数组的长度)
-            const tokenLength = encoded.bpe.length;
-
-            // 检查用于显示 Token 数量的元素是否存在
-            if (tokenCountArea) {
-                 tokenCountArea.textContent = `大约 Token 数量: ${tokenLength}`; // 显示结果
-                 tokenCountArea.style.display = 'inline'; // 让其可见
-            } else {
-                 console.warn("Token count area element not found, cannot display count.");
-            }
-         } catch (e) {
-              console.error("Token 计算失败:", e); // 如果分词过程出错
-              // 出错时也隐藏显示区域
-              if (tokenCountArea) {
-                   tokenCountArea.textContent = '';
-                   tokenCountArea.style.display = 'none';
-              }
-         }
-     } else {
-         // 如果 gpt-3-tokenizer 库未加载
-         if (tokenCountArea) {
-             // 隐藏 Token 显示区域
-             tokenCountArea.textContent = '';
-             tokenCountArea.style.display = 'none';
-         }
-         console.log("GPT3Tokenizer library not found. Skipping token count. (Make sure to include the library in your HTML)");
-     }
-}
-
-
-// 6. "复制" 按钮点击事件处理
+// 1. 复制按钮点击事件
 if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
-        // 组合文件结构和内容作为要复制的完整文本
-        const fullContentToCopy = `${generatedStructure}\n${generatedContent}`;
-        // 如果没有内容可复制，显示错误并返回
-        if (!fullContentToCopy || fullContentToCopy.trim() === "\n") {
-            showError("没有内容可复制。");
-            return;
-        }
-        // 检查浏览器是否支持 Clipboard API (通常需要 HTTPS 环境)
-        if (!navigator.clipboard) {
-            showError('当前浏览器不支持 Clipboard API (需要 HTTPS 环境)。');
-            return;
-        }
         try {
-            // 尝试将文本写入剪贴板
-            await navigator.clipboard.writeText(fullContentToCopy);
-            // 复制成功后，临时改变按钮文本和样式作为反馈
-            const originalText = copyBtn.innerHTML;
-            copyBtn.innerHTML = '<i class="gg-copy"></i> 已复制!'; // 使用图标和文字提示
-            copyBtn.style.backgroundColor = '#28a745'; // 绿色背景表示成功
-            // 2秒后恢复按钮原始状态
+            // 准备要复制的文本
+            const textToCopy = [
+                generatedStructure,
+                '', // 空行分隔
+                generatedContent
+            ].join('\n');
+
+            // 使用 Clipboard API 复制文本
+            await navigator.clipboard.writeText(textToCopy);
+            
+            // 临时修改按钮文本以提供反馈
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '已复制!';
+            copyBtn.style.backgroundColor = '#28a745'; // 变为绿色
+            
+            // 2秒后恢复按钮原样
             setTimeout(() => {
-                copyBtn.innerHTML = originalText;
-                copyBtn.style.backgroundColor = ''; // 恢复背景色
+                copyBtn.textContent = originalText;
+                copyBtn.style.backgroundColor = ''; // 恢复原色
             }, 2000);
+
         } catch (err) {
-            console.error('复制文本失败: ', err);
-            showError('复制文本到剪贴板失败。请检查浏览器权限。');
+            console.error('复制失败:', err);
+            showError('复制到剪贴板失败。请手动复制文本。');
         }
     });
 } else {
-    console.warn("Warning: copyBtn element not found. 'Copy' functionality will not work.");
+    console.warn("Warning: copyBtn element not found. Copy functionality will not work.");
 }
 
-
-// 7. "下载 .txt 文件" 按钮点击事件处理
+// 2. 下载按钮点击事件
 if (downloadTxtBtn) {
     downloadTxtBtn.addEventListener('click', () => {
-        // 组合要下载的完整内容
-        const fullContentToDownload = `${generatedStructure}\n${generatedContent}`;
-        // 如果没有内容可下载，显示错误并返回
-        if (!fullContentToDownload || fullContentToDownload.trim() === "\n") {
-            showError("没有生成内容可供下载。");
-            return;
+        try {
+            // 准备要下载的文本内容
+            const textToDownload = [
+                generatedStructure,
+                '', // 空行分隔
+                generatedContent
+            ].join('\n');
+
+            // 创建 Blob 对象
+            const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+            
+            // 创建下载链接
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            
+            // 生成文件名：从仓库URL提取仓库名
+            const repoName = currentRepoUrl ? currentRepoUrl.split('/').pop() || 'repo' : 'repo';
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `${repoName}-files-${timestamp}.txt`;
+            
+            // 触发下载
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }, 100);
+
+        } catch (err) {
+            console.error('下载失败:', err);
+            showError('创建下载文件失败。请手动复制文本。');
         }
-
-        // 创建一个 Blob 对象 (二进制大对象)，包含文本内容和类型信息
-        const blob = new Blob([fullContentToDownload], { type: 'text/plain;charset=utf-8' });
-        // 创建一个指向该 Blob 的临时 URL
-        const downloadUrl = URL.createObjectURL(blob);
-
-        // 尝试生成一个更友好的默认文件名
-        let filename = "repository_content.txt"; // 默认文件名
-        if (currentRepoUrl) { // 如果有当前仓库 URL
-            try {
-                const url = new URL(currentRepoUrl); // 解析 URL
-                // 从路径中提取 owner 和 repo name
-                const pathParts = url.pathname.split('/').filter(Boolean); // 过滤掉空的部分
-                if (pathParts.length >= 2) {
-                    // const owner = pathParts[0]; // 仓库所有者 (未使用)
-                    const repoName = pathParts[1]; // 仓库名称
-                    let branch = 'main'; // 默认分支名
-                    // 尝试从 URL 中提取分支名 (如果 URL 结构符合 owner/repo/tree/branch)
-                    if (pathParts.length >= 4 && pathParts[2] === 'tree') {
-                         branch = pathParts[3];
-                    }
-                    // 清理仓库名和分支名，替换不允许在文件名中使用的字符
-                    const safeRepoName = repoName.replace(/[^a-z0-9_-]/gi, '_');
-                    const safeBranch = branch.replace(/[^a-z0-9_-]/gi, '_');
-                    // 组合成新的文件名
-                    filename = `${safeRepoName}_${safeBranch}_content.txt`;
-                }
-            } catch (e) {
-                console.warn("无法根据 URL 生成动态文件名，将使用默认文件名。", e);
-            }
-        }
-
-        // 创建一个隐藏的 <a> 标签来触发下载
-        const a = document.createElement('a');
-        a.href = downloadUrl; // 设置下载链接
-        a.download = filename; // 设置下载文件名
-        document.body.appendChild(a); // 将 <a> 标签添加到页面
-        a.click(); // 模拟点击该标签
-        document.body.removeChild(a); // 下载开始后移除该标签
-        URL.revokeObjectURL(downloadUrl); // 释放之前创建的临时 URL
-
-        // 下载触发后，临时改变按钮文本作为反馈
-        const originalText = downloadTxtBtn.innerHTML;
-        downloadTxtBtn.innerHTML = '<i class="gg-software-download"></i> 已下载!'; // 使用图标和文字提示
-        // 2秒后恢复按钮文本
-        setTimeout(() => { downloadTxtBtn.innerHTML = originalText; }, 2000);
     });
 } else {
-     console.warn("Warning: downloadTxtBtn element not found. 'Download' functionality will not work.");
+    console.warn("Warning: downloadTxtBtn element not found. Download functionality will not work.");
 }
 
-// --- 初始设置 ---
-// 在页面加载完成后执行一些初始化操作 (如果需要的话)
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM fully loaded and parsed.');
-    // 可以在这里添加页面加载后需要立即执行的代码
-    // 例如，重置界面到初始状态
-    resetSubsequentSections();
-    // 隐藏状态和错误区域
-    hideStatusAndError();
-    // 可以在这里尝试聚焦到第一个输入框
-    if (repoUrlInput) {
-        // repoUrlInput.focus(); // 取消注释以启用自动聚焦
-    }
-});
+// --- Token 计数功能 ---
+// 使用简单的启发式方法估算 token 数量
+function calculateTokenCount(text) {
+    if (!text) return 0;
+    
+    // 1. 将文本分割成单词（考虑各种分隔符）
+    const words = text.split(/[\s\n\t\r.,!?;:(){}\[\]<>"'`~|\\/@#$%^&*+=_-]+/)
+                     .filter(word => word.length > 0);
+    
+    // 2. 统计单词中的字符总数
+    const totalChars = words.reduce((sum, word) => sum + word.length, 0);
+    
+    // 3. 使用启发式规则计算预估 token 数：
+    // - 每个单词平均约为 1.3 tokens（考虑到一些单词会被分成多个 token）
+    // - 加上标点符号和空格等额外 token
+    const estimatedTokens = Math.ceil(words.length * 1.3 + (text.length - totalChars) * 0.5);
+    
+    return estimatedTokens;
+}
 
-console.log('Script execution finished.');
-// --- END OF script.js ---
+// 显示 Token 计数的函数
+function calculateAndDisplayTokenCount(text) {
+    if (!tokenCountArea) return;
+    
+    const count = calculateTokenCount(text);
+    tokenCountArea.style.display = 'block';
+    tokenCountArea.textContent = `预估 Token 数量: ${count.toLocaleString()}`;
+    
+    // 根据数量添加视觉提示
+    if (count > 6000) {
+        tokenCountArea.style.color = '#dc3545'; // 红色警告
+    } else if (count > 4000) {
+        tokenCountArea.style.color = '#ffc107'; // 黄色警告
+    } else {
+        tokenCountArea.style.color = '#28a745'; // 绿色安全
+    }
+}
+
+// END OF script.js
