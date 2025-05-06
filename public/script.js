@@ -1,5 +1,17 @@
 // public/script.js
-// 完整且修正后的代码版本 - 包含 Token 计数功能
+// --- 工具函数 ---
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 
 // --- DOM 元素获取 ---
 // 这里获取了 HTML 页面中所有需要用 JavaScript 操作的元素
@@ -659,21 +671,27 @@ function populateExtensionFilters(files) { // 参数 files 应该是只包含 bl
 
 
 // 3. 处理文件类型过滤器复选框的变化
-function handleFilterChange() {
-    activeFilters.clear(); // 清空当前激活的过滤器集合
-    if (!extensionFiltersContainer) return; // 安全检查
+// 创建防抖版本的渲染函数
+const debouncedRenderFileTree = debounce((data) => {
+    renderFileTree(data);
+}, 200); // 200ms 延迟
 
-    // 获取所有过滤器复选框
+// 替换原有的 handleFilterChange 函数
+function handleFilterChange() {
+    activeFilters.clear();
+    if (!extensionFiltersContainer) return;
+
     const checkboxes = extensionFiltersContainer.querySelectorAll('input[type="checkbox"]');
-    // 遍历复选框，将被选中的值添加到 activeFilters 集合中
     checkboxes.forEach(cb => {
         if (cb.checked) {
             activeFilters.add(cb.value);
         }
     });
-    // 使用原始的、完整的文件列表重新渲染文件树，renderFileTree 内部会应用新的 activeFilters
-    renderFileTree(fileTreeData);
+    
+    // 使用防抖处理的渲染函数
+    debouncedRenderFileTree(fileTreeData);
 }
+
 
 
 // 4. 渲染文件树 (主函数，调用多个助手函数)
@@ -854,84 +872,6 @@ if (generateTextBtn) {
     console.warn("Warning: generateTextBtn element not found. 'Generate Text' functionality will not work.");
 }
 
-// --- 复制和下载按钮事件处理 ---
-
-// 1. 复制按钮点击事件
-if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-        try {
-            // 准备要复制的文本
-            const textToCopy = [
-                generatedStructure,
-                '', // 空行分隔
-                generatedContent
-            ].join('\n');
-
-            // 使用 Clipboard API 复制文本
-            await navigator.clipboard.writeText(textToCopy);
-            
-            // 临时修改按钮文本以提供反馈
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = '已复制!';
-            copyBtn.style.backgroundColor = '#28a745'; // 变为绿色
-            
-            // 2秒后恢复按钮原样
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-                copyBtn.style.backgroundColor = ''; // 恢复原色
-            }, 2000);
-
-        } catch (err) {
-            console.error('复制失败:', err);
-            showError('复制到剪贴板失败。请手动复制文本。');
-        }
-    });
-} else {
-    console.warn("Warning: copyBtn element not found. Copy functionality will not work.");
-}
-
-// 2. 下载按钮点击事件
-if (downloadTxtBtn) {
-    downloadTxtBtn.addEventListener('click', () => {
-        try {
-            // 准备要下载的文本内容
-            const textToDownload = [
-                generatedStructure,
-                '', // 空行分隔
-                generatedContent
-            ].join('\n');
-
-            // 创建 Blob 对象
-            const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
-            
-            // 创建下载链接
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            
-            // 生成文件名：从仓库URL提取仓库名
-            const repoName = currentRepoUrl ? currentRepoUrl.split('/').pop() || 'repo' : 'repo';
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-            a.download = `${repoName}-files-${timestamp}.txt`;
-            
-            // 触发下载
-            document.body.appendChild(a);
-            a.click();
-            
-            // 清理
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(a.href);
-            }, 100);
-
-        } catch (err) {
-            console.error('下载失败:', err);
-            showError('创建下载文件失败。请手动复制文本。');
-        }
-    });
-} else {
-    console.warn("Warning: downloadTxtBtn element not found. Download functionality will not work.");
-}
-
 // --- Token 计数功能 ---
 // 使用简单的启发式方法估算 token 数量
 function calculateTokenCount(text) {
@@ -969,5 +909,81 @@ function calculateAndDisplayTokenCount(text) {
         tokenCountArea.style.color = '#28a745'; // 绿色安全
     }
 }
+
+// 在文件末尾添加
+document.addEventListener('DOMContentLoaded', () => {
+    // 获取所有需要添加事件监听的元素
+    const elements = {
+        fetchStructureBtn,
+        selectAllBtn,
+        deselectAllBtn,
+        generateTextBtn,
+        copyBtn,
+        downloadTxtBtn,
+        extensionFiltersContainer,
+        repoForm
+    };
+
+    // 检查并记录缺失的元素
+    const missingElements = Object.entries(elements)
+        .filter(([key, element]) => !element)
+        .map(([key]) => key);
+
+    if (missingElements.length > 0) {
+        console.warn('Warning: The following elements were not found:', missingElements);
+    }
+
+    // 替换现有的复制按钮事件处理器
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+            try {
+                const textToCopy = [generatedStructure, '', generatedContent].join('\n');
+                await navigator.clipboard.writeText(textToCopy);
+                
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '已复制!';
+                copyBtn.style.backgroundColor = '#28a745';
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.backgroundColor = '';
+                }, 2000);
+
+            } catch (err) {
+                console.error('Copy to clipboard failed:', err);
+                showError('复制到剪贴板失败。请手动复制文本。');
+            }
+        });
+    }
+
+    // 替换现有的下载按钮事件处理器
+    if (downloadTxtBtn) {
+        downloadTxtBtn.addEventListener('click', () => {
+            try {
+                const textToDownload = [generatedStructure, '', generatedContent].join('\n');
+                const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                
+                const repoName = currentRepoUrl ? currentRepoUrl.split('/').pop() || 'repo' : 'repo';
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                a.download = `${repoName}-files-${timestamp}.txt`;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                }, 100);
+
+            } catch (err) {
+                console.error('Download failed:', err);
+                showError('创建下载文件失败。请手动复制文本。');
+            }
+        });
+    }
+});
+
 
 // END OF script.js
