@@ -1,5 +1,4 @@
 // script.js
-// THIS IS THE COMPLETE CODE FOR THIS FILE - NO OMISSIONS - FIXED SyntaxError on line 37
 
 // --- DOM Elements (VERIFIED COMPLETE LIST) ---
 const repoForm = document.getElementById('repoForm');
@@ -101,6 +100,294 @@ function resetSubsequentSections() {
     if (tokenCountArea) tokenCountArea.textContent = ''; // Clear token count
 }
 
+// --- File Tree Helper Functions (提取自renderFileTree) ---
+
+// 构建文件层次结构
+function buildHierarchy(itemList) {
+    const hierarchy = { 
+        name: 'root', 
+        path: '', 
+        type: 'tree', 
+        children: {}, 
+        isVisibleBasedOnFilters: true 
+    }; // Root node
+
+    itemList.sort((a, b) => {
+        const depthA = a.path.split('/').length;
+        const depthB = b.path.split('/').length;
+        if (depthA !== depthB) { return depthA - depthB; }
+        return a.path.localeCompare(b.path);
+    })
+    .forEach(item => {
+        let currentLevel = hierarchy;
+        const pathParts = item.path.split('/');
+
+        pathParts.forEach((part, index) => {
+            const currentPath = pathParts.slice(0, index + 1).join('/');
+            const isLastPart = index === pathParts.length - 1;
+
+            if (!currentLevel.children[part]) {
+                currentLevel.children[part] = {
+                    name: part, path: currentPath,
+                    type: isLastPart ? item.type : 'tree',
+                    children: {}, element: null, checkbox: null,
+                    isVisibleBasedOnFilters: false,
+                    originalItem: isLastPart ? item : null
+                };
+            } else if (isLastPart) {
+                currentLevel.children[part].type = item.type;
+                currentLevel.children[part].originalItem = item;
+            }
+            currentLevel = currentLevel.children[part];
+        });
+    });
+    return hierarchy;
+}
+
+// 检查文件是否应该基于筛选条件显示
+function isDirectlyVisible(item) {
+    if (item.type === 'blob') {
+        const pathLower = item.path.toLowerCase();
+        const parts = pathLower.split('.');
+        let filterKey = null;
+        if (parts.length > 1) {
+            const ext = '.' + parts.pop();
+            if (ALLOWED_EXTENSIONS_FRONTEND.has(ext)) filterKey = ext;
+        }
+        if (!filterKey) {
+            const filename = pathLower.substring(pathLower.lastIndexOf('/') + 1);
+            if (ALLOWED_EXTENSIONS_FRONTEND.has(filename)) filterKey = filename;
+        }
+        return filterKey && activeFilters.has(filterKey);
+    }
+    return false;
+}
+
+// 递归应用可见性标记
+function applyVisibility(node) {
+    if (node.type === 'blob') {
+        node.isVisibleBasedOnFilters = isDirectlyVisible(node);
+        return node.isVisibleBasedOnFilters;
+    } else { // Directory or root
+        let hasVisibleChild = false;
+        Object.values(node.children).forEach(child => {
+            if (applyVisibility(child)) { // Recurse first
+                hasVisibleChild = true;
+            }
+        });
+        node.isVisibleBasedOnFilters = hasVisibleChild;
+        return hasVisibleChild;
+    }
+}
+
+// 渲染单个节点
+function renderNode(node, parentUl, isRootLevel = false) {
+    if (!node.isVisibleBasedOnFilters && !isRootLevel) { return; }
+
+    const li = document.createElement('li');
+    li.className = node.type;
+    if (!node.isVisibleBasedOnFilters && node.type === 'tree') {
+        li.classList.add('filtered-out-dir');
+    }
+    node.element = li;
+
+    const nodeContent = document.createElement('div');
+    nodeContent.className = 'node-content';
+
+    const hasRenderableChildren = Object.values(node.children).some(child => child.isVisibleBasedOnFilters);
+    if (node.type === 'tree' && Object.keys(node.children).length > 0) {
+        const toggle = document.createElement('span');
+        toggle.className = 'toggle expanded';
+        toggle.textContent = '▼';
+        if (hasRenderableChildren) {
+            toggle.onclick = (e) => {
+                e.stopPropagation();
+                const subUl = li.querySelector(':scope > ul');
+                if (subUl) {
+                    const isExpanded = subUl.style.display !== 'none';
+                    subUl.style.display = isExpanded ? 'none' : 'block';
+                    toggle.textContent = isExpanded ? '▶' : '▼';
+                    toggle.classList.toggle('expanded', !isExpanded);
+                    toggle.classList.toggle('collapsed', isExpanded);
+                }
+            };
+        } else {
+            toggle.classList.add('empty');
+            toggle.textContent = ' ';
+        }
+        nodeContent.appendChild(toggle);
+    } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'toggle-placeholder';
+        nodeContent.appendChild(placeholder);
+    }
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = node.path;
+    // Check files if they are visible, leave directories unchecked initially
+    checkbox.checked = node.type === 'blob' && node.isVisibleBasedOnFilters;
+    checkbox.className = 'file-tree-checkbox';
+    checkbox.id = `cb-${node.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    node.checkbox = checkbox;
+    nodeContent.appendChild(checkbox);
+
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+
+    const icon = document.createElement('span');
+    icon.className = 'node-icon';
+    icon.textContent = node.type === 'tree' ? '📁' : '📄';
+    label.appendChild(icon);
+
+    label.appendChild(document.createTextNode(` ${node.name || '.'}`));
+    nodeContent.appendChild(label);
+
+    li.appendChild(nodeContent);
+
+    if (node.type === 'tree' && Object.keys(node.children).length > 0) {
+        const subUl = document.createElement('ul');
+        Object.values(node.children)
+            .sort((a, b) => {
+                if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
+                return a.name.localeCompare(b.name);
+            })
+            .forEach(child => renderNode(child, subUl));
+
+        if (subUl.children.length > 0) {
+            li.appendChild(subUl);
+            // Ensure subUl is visible initially if toggle is expanded
+            subUl.style.display = 'block';
+        }
+    }
+    parentUl.appendChild(li);
+}
+
+// 根据路径查找节点
+function findNodeByPath(root, path) {
+    if (!root || !path) return null;
+    let currentLevel = root;
+    const parts = path.split('/');
+    for (const part of parts) {
+        if (currentLevel && currentLevel.children && currentLevel.children[part]) {
+            currentLevel = currentLevel.children[part];
+        } else {
+            return null;
+        }
+    }
+    return currentLevel;
+}
+
+// 更新复选框状态（向下和向上）
+function updateCheckStatus(node, checked) {
+    if (!node || !node.checkbox || node.checkbox.disabled) return;
+
+    node.checkbox.checked = checked;
+    node.checkbox.indeterminate = false;
+
+    if (node.type === 'tree') {
+        Object.values(node.children).forEach(child => {
+            if (child.isVisibleBasedOnFilters) { // Only update visible children
+                updateCheckStatus(child, checked);
+            }
+        });
+    }
+    updateParentCheckbox(node);
+}
+
+// 根据子节点更新父节点复选框状态
+function updateParentCheckbox(node) {
+    const pathParts = node.path.split('/');
+    if (pathParts.length <= 1) return; // Root item, no parent
+
+    const parentPath = pathParts.slice(0, -1).join('/');
+    const parentNode = findNodeByPath(fileHierarchy, parentPath);
+
+    if (!parentNode || !parentNode.checkbox || parentNode.checkbox.disabled) return;
+
+    let allChildrenChecked = true;
+    let someChildrenChecked = false;
+    let hasVisibleChildren = false;
+
+    Object.values(parentNode.children).forEach(child => {
+        if (child.isVisibleBasedOnFilters && child.checkbox) {
+            hasVisibleChildren = true;
+            if (!child.checkbox.checked && !child.checkbox.indeterminate) {
+                allChildrenChecked = false;
+            }
+            if (child.checkbox.checked || child.checkbox.indeterminate) {
+                someChildrenChecked = true;
+            }
+        }
+    });
+
+    if (!hasVisibleChildren) {
+        parentNode.checkbox.checked = false;
+        parentNode.checkbox.indeterminate = false;
+    } else if (allChildrenChecked) {
+        parentNode.checkbox.checked = true;
+        parentNode.checkbox.indeterminate = false;
+    } else if (someChildrenChecked) {
+        parentNode.checkbox.checked = false;
+        parentNode.checkbox.indeterminate = true;
+    } else {
+        parentNode.checkbox.checked = false;
+        parentNode.checkbox.indeterminate = false;
+    }
+    updateParentCheckbox(parentNode); // Recurse upwards
+}
+
+// 初始化复选框状态
+function initializeCheckboxStates(node) {
+    if (!node) return;
+    let allChecked = true;
+    let someChecked = false;
+    let hasVisibleChildren = false;
+
+    if (node.type === 'tree') {
+        Object.values(node.children).forEach(child => {
+            if(child.isVisibleBasedOnFilters) {
+                hasVisibleChildren = true;
+                initializeCheckboxStates(child); // Recurse first
+                if (child.checkbox) {
+                    if (!child.checkbox.checked && !child.checkbox.indeterminate) { allChecked = false; }
+                    if (child.checkbox.checked || child.checkbox.indeterminate) { someChecked = true; }
+                } else { allChecked = false; } // Should not happen for visible node, but safe check
+            }
+        });
+    }
+
+    if (node.type === 'tree' && node.checkbox && !node.checkbox.disabled) {
+        if (!hasVisibleChildren) {
+            node.checkbox.checked = false;
+            node.checkbox.indeterminate = false;
+        } else if (allChecked) {
+            node.checkbox.checked = true;
+            node.checkbox.indeterminate = false;
+        } else if (someChecked) {
+            node.checkbox.checked = false;
+            node.checkbox.indeterminate = true;
+        } else {
+            node.checkbox.checked = false;
+            node.checkbox.indeterminate = false;
+        }
+    }
+    // File checkboxes are initialized during renderNode based on visibility
+}
+
+// 统一的全选/全不选函数 (新增)
+function setAllVisibleCheckboxes(node, isChecked) {
+    if (!node.isVisibleBasedOnFilters || !node.checkbox || node.checkbox.disabled) return;
+    
+    node.checkbox.checked = isChecked;
+    node.checkbox.indeterminate = false;
+    
+    if (node.type === 'tree') {
+        Object.values(node.children).forEach(child => 
+            setAllVisibleCheckboxes(child, isChecked)
+        );
+    }
+}
 
 // --- Core Logic ---
 
@@ -240,7 +527,7 @@ function handleFilterChange() {
 }
 
 
-// 4. Render File Tree (Hierarchical structure)
+// 4. Render File Tree (使用提取的辅助函数)
 function renderFileTree(items) {
     if (!fileTreeContainer) {
         console.error("fileTreeContainer not found, cannot render tree.");
@@ -248,164 +535,11 @@ function renderFileTree(items) {
     }
     fileTreeContainer.innerHTML = ''; // Clear previous tree
 
-    // --- Helper: Build Nested Structure ---
-    function buildHierarchy(itemList) {
-        const hierarchy = { name: 'root', path: '', type: 'tree', children: {}, isVisibleBasedOnFilters: true }; // Root node
-
-        itemList.sort((a, b) => {
-             const depthA = a.path.split('/').length;
-             const depthB = b.path.split('/').length;
-             if (depthA !== depthB) { return depthA - depthB; }
-             return a.path.localeCompare(b.path);
-         })
-        .forEach(item => {
-            let currentLevel = hierarchy;
-            const pathParts = item.path.split('/');
-
-            pathParts.forEach((part, index) => {
-                const currentPath = pathParts.slice(0, index + 1).join('/');
-                const isLastPart = index === pathParts.length - 1;
-
-                if (!currentLevel.children[part]) {
-                     currentLevel.children[part] = {
-                         name: part, path: currentPath,
-                         type: isLastPart ? item.type : 'tree',
-                         children: {}, element: null, checkbox: null,
-                         isVisibleBasedOnFilters: false,
-                         originalItem: isLastPart ? item : null
-                     };
-                 } else if (isLastPart) {
-                     currentLevel.children[part].type = item.type;
-                     currentLevel.children[part].originalItem = item;
-                 }
-                 currentLevel = currentLevel.children[part];
-            });
-        });
-        return hierarchy;
-    }
-
-     // --- Helper: Should Item Be Visible Based on Filters? ---
-     function isDirectlyVisible(item) { // Checks if this specific item matches filters
-         if (item.type === 'blob') {
-             const pathLower = item.path.toLowerCase();
-             const parts = pathLower.split('.');
-             let filterKey = null;
-             if (parts.length > 1) {
-                 const ext = '.' + parts.pop();
-                 if (ALLOWED_EXTENSIONS_FRONTEND.has(ext)) filterKey = ext;
-             }
-             if (!filterKey) {
-                 const filename = pathLower.substring(pathLower.lastIndexOf('/') + 1);
-                 if (ALLOWED_EXTENSIONS_FRONTEND.has(filename)) filterKey = filename;
-             }
-             return filterKey && activeFilters.has(filterKey);
-         }
-         return false;
-     }
-
-     // --- Helper: Recursively Apply Visibility (Post-order traversal) ---
-     function applyVisibility(node) {
-         if (node.type === 'blob') {
-             node.isVisibleBasedOnFilters = isDirectlyVisible(node);
-             return node.isVisibleBasedOnFilters;
-         } else { // Directory or root
-             let hasVisibleChild = false;
-             Object.values(node.children).forEach(child => {
-                 if (applyVisibility(child)) { // Recurse first
-                     hasVisibleChild = true;
-                 }
-             });
-             node.isVisibleBasedOnFilters = hasVisibleChild;
-             return hasVisibleChild;
-         }
-     }
-
-    // --- Helper: Render the actual HTML Tree ---
-    function renderNode(node, parentUl, isRootLevel = false) {
-        if (!node.isVisibleBasedOnFilters && !isRootLevel) { return; }
-
-        const li = document.createElement('li');
-        li.className = node.type;
-        if (!node.isVisibleBasedOnFilters && node.type === 'tree') {
-             li.classList.add('filtered-out-dir');
-        }
-        node.element = li;
-
-        const nodeContent = document.createElement('div');
-        nodeContent.className = 'node-content';
-
-        const hasRenderableChildren = Object.values(node.children).some(child => child.isVisibleBasedOnFilters);
-        if (node.type === 'tree' && Object.keys(node.children).length > 0) {
-            const toggle = document.createElement('span');
-            toggle.className = 'toggle expanded';
-            toggle.textContent = '▼';
-            if (hasRenderableChildren) {
-                 toggle.onclick = (e) => {
-                    e.stopPropagation();
-                    const subUl = li.querySelector(':scope > ul');
-                    if (subUl) {
-                        const isExpanded = subUl.style.display !== 'none';
-                        subUl.style.display = isExpanded ? 'none' : 'block';
-                        toggle.textContent = isExpanded ? '▶' : '▼';
-                        toggle.classList.toggle('expanded', !isExpanded);
-                        toggle.classList.toggle('collapsed', isExpanded);
-                    }
-                 };
-             } else {
-                 toggle.classList.add('empty');
-                 toggle.textContent = ' ';
-             }
-            nodeContent.appendChild(toggle);
-        } else {
-            const placeholder = document.createElement('span');
-            placeholder.className = 'toggle-placeholder';
-            nodeContent.appendChild(placeholder);
-        }
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = node.path;
-        // Check files if they are visible, leave directories unchecked initially
-        checkbox.checked = node.type === 'blob' && node.isVisibleBasedOnFilters;
-        checkbox.className = 'file-tree-checkbox';
-        checkbox.id = `cb-${node.path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-        node.checkbox = checkbox;
-        nodeContent.appendChild(checkbox);
-
-        const label = document.createElement('label');
-        label.htmlFor = checkbox.id;
-
-        const icon = document.createElement('span');
-        icon.className = 'node-icon';
-        icon.textContent = node.type === 'tree' ? '📁' : '📄';
-        label.appendChild(icon);
-
-        label.appendChild(document.createTextNode(` ${node.name || '.'}`));
-        nodeContent.appendChild(label);
-
-        li.appendChild(nodeContent);
-
-        if (node.type === 'tree' && Object.keys(node.children).length > 0) {
-            const subUl = document.createElement('ul');
-            Object.values(node.children)
-                .sort((a, b) => {
-                     if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
-                     return a.name.localeCompare(b.name);
-                 })
-                .forEach(child => renderNode(child, subUl));
-
-            if (subUl.children.length > 0) {
-               li.appendChild(subUl);
-               // Ensure subUl is visible initially if toggle is expanded
-               subUl.style.display = 'block';
-            }
-        }
-        parentUl.appendChild(li);
-    }
-
-    // --- Main Tree Rendering Steps ---
+    // 构建层次结构
     const hierarchy = buildHierarchy(items);
     fileHierarchy = hierarchy; // Store globally AFTER building
+    
+    // 应用过滤器可见性
     applyVisibility(hierarchy);
 
     const rootUl = document.createElement('ul');
@@ -421,16 +555,17 @@ function renderFileTree(items) {
          return;
     }
 
+    // 渲染树形结构
     Object.values(hierarchy.children)
-           .sort((a, b) => {
-             if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
-             return a.name.localeCompare(b.name);
-            })
-           .forEach(node => renderNode(node, rootUl, true));
+        .sort((a, b) => {
+            if (a.type !== b.type) { return a.type === 'tree' ? -1 : 1; }
+            return a.name.localeCompare(b.name);
+        })
+        .forEach(node => renderNode(node, rootUl, true));
 
     fileTreeContainer.appendChild(rootUl);
 
-    // --- Add Checkbox Synchronization Logic ---
+    // 添加复选框事件监听
     const allCheckboxes = fileTreeContainer.querySelectorAll('.file-tree-checkbox');
     allCheckboxes.forEach(cb => {
         cb.addEventListener('change', () => {
@@ -441,151 +576,24 @@ function renderFileTree(items) {
         });
     });
 
-    // Initialize parent states after initial render
+    // 初始化父节点状态
     initializeCheckboxStates(fileHierarchy);
 }
 
 
-// --- Checkbox Helper Functions ---
-
-function findNodeByPath(root, path) {
-    if (!root || !path) return null;
-    let currentLevel = root;
-    const parts = path.split('/');
-    for (const part of parts) {
-        if (currentLevel && currentLevel.children && currentLevel.children[part]) {
-            currentLevel = currentLevel.children[part];
-        } else {
-            return null;
-        }
-    }
-    return currentLevel;
-}
-
-// Update checkbox states downwards and upwards
-function updateCheckStatus(node, checked) {
-    if (!node || !node.checkbox || node.checkbox.disabled) return;
-
-    node.checkbox.checked = checked;
-    node.checkbox.indeterminate = false;
-
-    if (node.type === 'tree') {
-        Object.values(node.children).forEach(child => {
-             if (child.isVisibleBasedOnFilters) { // Only update visible children
-                  updateCheckStatus(child, checked);
-             }
-        });
-    }
-    updateParentCheckbox(node);
-}
-
-// Update a single parent's state based on its children
-function updateParentCheckbox(node) {
-    const pathParts = node.path.split('/');
-    if (pathParts.length <= 1) return; // Root item, no parent
-
-    const parentPath = pathParts.slice(0, -1).join('/');
-    const parentNode = findNodeByPath(fileHierarchy, parentPath);
-
-    if (!parentNode || !parentNode.checkbox || parentNode.checkbox.disabled) return;
-
-    let allChildrenChecked = true;
-    let someChildrenChecked = false;
-    let hasVisibleChildren = false;
-
-    Object.values(parentNode.children).forEach(child => {
-         if (child.isVisibleBasedOnFilters && child.checkbox) {
-             hasVisibleChildren = true;
-             if (!child.checkbox.checked && !child.checkbox.indeterminate) {
-                 allChildrenChecked = false;
-             }
-             if (child.checkbox.checked || child.checkbox.indeterminate) {
-                 someChildrenChecked = true;
-             }
-         }
-    });
-
-     if (!hasVisibleChildren) {
-        parentNode.checkbox.checked = false;
-        parentNode.checkbox.indeterminate = false;
-     } else if (allChildrenChecked) {
-        parentNode.checkbox.checked = true;
-        parentNode.checkbox.indeterminate = false;
-    } else if (someChildrenChecked) {
-        parentNode.checkbox.checked = false;
-        parentNode.checkbox.indeterminate = true;
-    } else {
-        parentNode.checkbox.checked = false;
-        parentNode.checkbox.indeterminate = false;
-    }
-    updateParentCheckbox(parentNode); // Recurse upwards
-}
-
-// Initialize checkbox states after rendering (post-order traversal)
-function initializeCheckboxStates(node) {
-    if (!node) return;
-    let allChecked = true;
-    let someChecked = false;
-    let hasVisibleChildren = false;
-
-    if (node.type === 'tree') {
-        Object.values(node.children).forEach(child => {
-             if(child.isVisibleBasedOnFilters) {
-                 hasVisibleChildren = true;
-                 initializeCheckboxStates(child); // Recurse first
-                 if (child.checkbox) {
-                     if (!child.checkbox.checked && !child.checkbox.indeterminate) { allChecked = false; }
-                     if (child.checkbox.checked || child.checkbox.indeterminate) { someChecked = true; }
-                 } else { allChecked = false; } // Should not happen for visible node, but safe check
-             }
-        });
-    }
-
-    if (node.type === 'tree' && node.checkbox && !node.checkbox.disabled) {
-         if (!hasVisibleChildren) {
-             node.checkbox.checked = false;
-             node.checkbox.indeterminate = false;
-         } else if (allChecked) {
-            node.checkbox.checked = true;
-            node.checkbox.indeterminate = false;
-        } else if (someChecked) {
-            node.checkbox.checked = false;
-            node.checkbox.indeterminate = true;
-        } else {
-            node.checkbox.checked = false;
-            node.checkbox.indeterminate = false;
-        }
-    }
-    // File checkboxes are initialized during renderNode based on visibility
-}
-
-
-// --- Select/Deselect All Visible Files ---
+// --- Select/Deselect All Visible Files (使用共享函数) ---
 selectAllBtn.addEventListener('click', () => {
     if (!fileHierarchy) return;
-    function setCheckRecursively(node, checked) {
-        if (!node.isVisibleBasedOnFilters || !node.checkbox || node.checkbox.disabled) return;
-        // Set state directly without triggering individual updates for performance
-        node.checkbox.checked = checked;
-        node.checkbox.indeterminate = false;
-        if (node.type === 'tree') {
-            Object.values(node.children).forEach(child => setCheckRecursively(child, checked));
-        }
-    }
-    Object.values(fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, true));
+    Object.values(fileHierarchy.children).forEach(rootChild => 
+        setAllVisibleCheckboxes(rootChild, true)
+    );
 });
 
 deselectAllBtn.addEventListener('click', () => {
     if (!fileHierarchy) return;
-     function setCheckRecursively(node, checked) {
-         if (!node.isVisibleBasedOnFilters || !node.checkbox || node.checkbox.disabled) return;
-         node.checkbox.checked = checked;
-         node.checkbox.indeterminate = false;
-         if (node.type === 'tree') {
-             Object.values(node.children).forEach(child => setCheckRecursively(child, checked));
-         }
-     }
-    Object.values(fileHierarchy.children).forEach(rootChild => setCheckRecursively(rootChild, false));
+    Object.values(fileHierarchy.children).forEach(rootChild => 
+        setAllVisibleCheckboxes(rootChild, false)
+    );
 });
 
 
@@ -725,48 +733,3 @@ downloadTxtBtn.addEventListener('click', () => {
     downloadTxtBtn.innerHTML = '<i class="gg-software-download"></i> Downloaded!';
     setTimeout(() => { downloadTxtBtn.innerHTML = originalText; }, 2000);
 });
-
-
-// Optional: Token Counting Function (Requires gpt-3-tokenizer library)
-function calculateAndDisplayTokenCount(text) {
-     if (typeof GPT3Tokenizer !== 'undefined') {
-         try {
-            // NOTE: Ensure the tokenizer library is actually loaded in your index.html
-            const tokenizer = new GPT3Tokenizer({ type: 'gpt3' });
-            const encoded = tokenizer.encode(text);
-            if (tokenCountArea) { // Check if element exists
-                 tokenCountArea.textContent = `Approx. Token Count: ${encoded.bpe.length}`;
-                 tokenCountArea.style.display = 'inline';
-            }
-         } catch (e) {
-              console.error("Token calculation failed:", e);
-              if (tokenCountArea) {
-                   tokenCountArea.textContent = '';
-                   tokenCountArea.style.display = 'none';
-              }
-         }
-     } else {
-         if (tokenCountArea) {
-             tokenCountArea.textContent = '';
-             tokenCountArea.style.display = 'none';
-         }
-         // console.log("GPT3Tokenizer library not found. Skipping token count.");
-     }
-}
-
-
-// --- Initial Setup ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("Repo2Txt Enhanced (Tree View - Fixed SyntaxError) Initialized");
-    // Check essential elements before proceeding
-    if(repoForm && fileTreeContainer && extensionFiltersContainer && structurePreview && contentPreview) {
-        resetSubsequentSections();
-        hideStatusAndError();
-    } else {
-         console.error("Initial setup failed: Essential DOM elements not found. Check HTML structure and element IDs.");
-         // Display a user-facing error if critical elements are missing
-         document.body.innerHTML = '<p style="color: red; font-weight: bold; margin: 20px;">Error: Application failed to initialize correctly. Please check the console for details.</p>';
-    }
-});
-// END OF script.js
-
