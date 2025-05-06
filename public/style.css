@@ -476,7 +476,7 @@ button i {
     /* Ensure consistent box model for easier height/padding management */
     box-sizing: border-box;
     /* Set a consistent height for inputs and the button */
-    height: 37px; /* Adjust as needed */
+    height: 30px; /* Adjust as needed */
     padding: 0.5em 0.75em; /* Adjust padding for aesthetics */
     margin-bottom: 15px; /* Consistent bottom margin */
     vertical-align: middle; /* Helps if they are inline-block and somehow misaligned */
