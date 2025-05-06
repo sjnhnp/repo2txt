@@ -33,8 +33,32 @@ const DEFAULT_EXCLUDES = [
 
 const MAX_FILES_TO_PROCESS = 500; // 限制选择的文件数量
 const MAX_TOTAL_SIZE_MB = 10; // 限制总内容大小(MB)
+const DEBUG_MODE = false; // 调试模式开关
 
 // --- Helper Functions ---
+
+/**
+ * 记录日志，可根据DEBUG_MODE决定是否记录详细信息
+ * @param {string} message 日志消息
+ * @param {string} level 日志级别 ('info', 'error', 'warn', 'debug')
+ */
+function log(message, level = 'info') {
+    if (level === 'debug' && !DEBUG_MODE) return;
+    
+    switch(level) {
+        case 'error':
+            console.error(message);
+            break;
+        case 'warn':
+            console.warn(message);
+            break;
+        case 'debug':
+            console.log(`[DEBUG] ${message}`);
+            break;
+        default:
+            console.log(message);
+    }
+}
 
 /**
  * 解析GitHub URL以提取所有者、仓库和分支信息
@@ -42,9 +66,9 @@ const MAX_TOTAL_SIZE_MB = 10; // 限制总内容大小(MB)
  * @returns {object|null} 包含 { owner, repo, branch } 的对象,无效则返回null
  */
 function parseGitHubUrl(url) {
-  //  console.log(`尝试解析URL: "${url}"`);
+    log(`尝试解析URL: "${url}"`, 'debug');
     if (!url || typeof url !== 'string') {
-    //    console.log("解析失败: URL为空或不是字符串");
+        log("解析失败: URL为空或不是字符串", 'debug');
         return null;
     }
     
@@ -56,11 +80,12 @@ function parseGitHubUrl(url) {
             repo: match[2],
             branch: match[3] || 'HEAD', // 使用HEAD作为默认值
         };
-      //  console.log("URL解析成功:", parsed);
+        log("URL解析成功:", 'debug');
+        log(parsed, 'debug');
         return parsed;
     }
     
-   // console.log("解析失败: URL格式不匹配");
+    log("解析失败: URL格式不匹配", 'debug');
     return null;
 }
 
@@ -165,6 +190,23 @@ function generateStructureString(selectedPaths) {
     return _formatTreeToString(treeObject);
 }
 
+/**
+ * 创建统一错误响应
+ * @param {string} message 错误消息
+ * @param {number} status HTTP状态码
+ * @param {object} corsHeaders CORS头信息
+ * @returns {Response} 格式化的响应对象
+ */
+function createErrorResponse(message, status, corsHeaders) {
+    return new Response(
+        JSON.stringify({ error: message }), 
+        { 
+            status: status, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+    );
+}
+
 // --- Main Request Handler ---
 export async function onRequestPost(context) {
     const { request, env } = context;
@@ -183,10 +225,7 @@ export async function onRequestPost(context) {
 
     // 只允许POST请求
     if (request.method !== 'POST') {
-        return new Response('Method Not Allowed', { 
-            status: 405, 
-            headers: corsHeaders 
-        });
+        return createErrorResponse('Method Not Allowed', 405, corsHeaders);
     }
 
     try {
@@ -194,64 +233,37 @@ export async function onRequestPost(context) {
         const requestData = await request.json();
         const { repoUrl, action, selectedFiles, pat } = requestData;
 
-        console.log("后端收到请求数据:", { 
+        log("后端收到请求数据:", 'info');
+        log({ 
             repoUrl, 
             action, 
             patProvided: !!pat, 
             selectedFilesCount: selectedFiles?.length 
-        });
+        }, 'debug');
 
         // --- 输入验证 ---
         if (!repoUrl) {
-            console.error("后端错误: 请求体中缺少repoUrl");
-            return new Response(
-                JSON.stringify({ error: 'Missing repoUrl' }), 
-                { 
-                    status: 400, 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                }
-            );
+            log("后端错误: 请求体中缺少repoUrl", 'error');
+            return createErrorResponse('Missing repoUrl', 400, corsHeaders);
         }
         if (!action) {
-            console.error("后端错误: 请求体中缺少action");
-            return new Response(
-                JSON.stringify({ 
-                    error: 'Missing action parameter (e.g., getTree, generateText)' 
-                }), 
-                { 
-                    status: 400, 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                }
-            );
+            log("后端错误: 请求体中缺少action", 'error');
+            return createErrorResponse('Missing action parameter (e.g., getTree, generateText)', 400, corsHeaders);
         }
 
         // 1. 解析URL
         const repoInfo = parseGitHubUrl(repoUrl);
         if (!repoInfo) {
-            console.error(`后端错误: parseGitHubUrl解析失败，输入: "${repoUrl}"`);
-            return new Response(
-                JSON.stringify({ error: 'Invalid GitHub repository URL format' }), 
-                { 
-                    status: 400, 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                }
-            );
+            log(`后端错误: parseGitHubUrl解析失败，输入: "${repoUrl}"`, 'error');
+            return createErrorResponse('Invalid GitHub repository URL format', 400, corsHeaders);
         }
         const { owner, repo, branch } = repoInfo;
 
         // 2. 获取Token
         const GITHUB_TOKEN = pat || env.GITHUB_TOKEN;
         if (!GITHUB_TOKEN) {
-            console.error("未在Cloudflare Pages环境中设置GITHUB_TOKEN密钥且未提供PAT。");
-            return new Response(
-                JSON.stringify({ 
-                    error: 'Server configuration error or missing token.' 
-                }), 
-                { 
-                    status: 500, 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                }
-            );
+            log("未在Cloudflare Pages环境中设置GITHUB_TOKEN密钥且未提供PAT。", 'error');
+            return createErrorResponse('Server configuration error or missing token.', 500, corsHeaders);
         }
         const authHeader = `Bearer ${GITHUB_TOKEN}`;
         const baseHeaders = {
@@ -262,7 +274,7 @@ export async function onRequestPost(context) {
 
         // --- Action: Get Tree ---
         if (action === 'getTree') {
-         //   console.log(`执行动作: getTree，目标 ${owner}/${repo}/${branch}`);
+            log(`执行动作: getTree，目标 ${owner}/${repo}/${branch}`, 'debug');
             const treeApiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
 
             const treeResponse = await fetch(treeApiUrl, { headers: baseHeaders });
@@ -274,67 +286,28 @@ export async function onRequestPost(context) {
                 try { 
                     errorBodyText = await treeResponse.text(); 
                 } catch (e) { 
-                    console.error("读取错误响应体失败:", e); 
+                    log("读取错误响应体失败:", 'error');
+                    log(e, 'debug');
                 }
                 
-                console.error(`获取树结构失败: ${status} ${treeResponse.statusText}. Body: ${errorBodyText}`);
+                log(`获取树结构失败: ${status} ${treeResponse.statusText}. Body: ${errorBodyText}`, 'error');
                 
                 if (status === 401) { 
-                    return new Response(
-                        JSON.stringify({ 
-                            error: 'Authentication failed. Invalid GitHub Token or PAT. Check token permissions (repo scope needed for private repos).' 
-                        }), 
-                        { 
-                            status: 401, 
-                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                        }
-                    ); 
+                    return createErrorResponse('Authentication failed. Invalid GitHub Token or PAT. Check token permissions (repo scope needed for private repos).', 401, corsHeaders);
                 }
                 
                 if (status === 403) {
-                     if (errorBodyText.includes("API rate limit exceeded")) { 
-                         return new Response(
-                             JSON.stringify({ 
-                                 error: 'GitHub API rate limit exceeded. Please try again later or provide a Personal Access Token (PAT).' 
-                             }), 
-                             { 
-                                 status: 429, 
-                                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                             }
-                         ); 
-                     }
-                     return new Response(
-                         JSON.stringify({ 
-                             error: 'Access forbidden. Check token permissions or repository access rights.' 
-                         }), 
-                         { 
-                             status: 403, 
-                             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                         }
-                     );
+                    if (errorBodyText.includes("API rate limit exceeded")) { 
+                        return createErrorResponse('GitHub API rate limit exceeded. Please try again later or provide a Personal Access Token (PAT).', 429, corsHeaders);
+                    }
+                    return createErrorResponse('Access forbidden. Check token permissions or repository access rights.', 403, corsHeaders);
                 }
                 
                 if (status === 404) { 
-                    return new Response(
-                        JSON.stringify({ 
-                            error: 'Repository, branch, or tree not found. Check the URL and branch name.' 
-                        }), 
-                        { 
-                            status: 404, 
-                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                        }
-                    ); 
+                    return createErrorResponse('Repository, branch, or tree not found. Check the URL and branch name.', 404, corsHeaders);
                 }
                 
-                return new Response(
-                    JSON.stringify({ 
-                        error: `Failed to fetch repository tree from GitHub (Status: ${status}).` 
-                    }), 
-                    { 
-                        status: status, 
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                    }
-                );
+                return createErrorResponse(`Failed to fetch repository tree from GitHub (Status: ${status}).`, status, corsHeaders);
             }
 
             // 处理成功的树结构响应
@@ -342,7 +315,7 @@ export async function onRequestPost(context) {
             let isTruncated = treeData.truncated || false;
 
             if (isTruncated) { 
-                console.warn(`仓库树结构被GitHub API截断。`); 
+                log(`仓库树结构被GitHub API截断。`, 'warn'); 
             }
 
             // 过滤项目
@@ -379,7 +352,7 @@ export async function onRequestPost(context) {
                 return false; // 排除未知类型
             });
 
-         //   console.log(`过滤后返回 ${filteredTree.length} 个项目(文件和目录)给前端。`);
+            log(`过滤后返回 ${filteredTree.length} 个项目(文件和目录)给前端。`, 'debug');
 
             // 发送过滤后的列表
             return new Response(
@@ -399,45 +372,29 @@ export async function onRequestPost(context) {
 
         // --- Action: Generate Text ---
         else if (action === 'generateText') {
-        //    console.log(`执行动作: generateText，目标 ${owner}/${repo}/${branch}`);
+            log(`执行动作: generateText，目标 ${owner}/${repo}/${branch}`, 'debug');
 
             // 验证selectedFiles输入
             if (!selectedFiles || !Array.isArray(selectedFiles)) {
-                return new Response(
-                    JSON.stringify({ 
-                        error: 'Missing or invalid selectedFiles array' 
-                    }), 
-                    { 
-                        status: 400, 
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                    }
-                );
+                return createErrorResponse('Missing or invalid selectedFiles array', 400, corsHeaders);
             }
             
             if (selectedFiles.length === 0) {
-                 return new Response(
-                     JSON.stringify({ 
-                         content: "No files selected for processing.", 
-                         structure: "" 
-                     }), 
-                     { 
-                         status: 200, 
-                         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                     }
-                 );
-            }
-            
-            if (selectedFiles.length > MAX_FILES_TO_PROCESS) {
-                console.warn(`选择的文件太多: ${selectedFiles.length}, 限制: ${MAX_FILES_TO_PROCESS}`);
                 return new Response(
                     JSON.stringify({ 
-                        error: `Too many files selected (${selectedFiles.length}). Please select ${MAX_FILES_TO_PROCESS} or fewer.` 
+                        content: "No files selected for processing.", 
+                        structure: "" 
                     }), 
                     { 
-                        status: 413, 
+                        status: 200, 
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
                     }
                 );
+            }
+            
+            if (selectedFiles.length > MAX_FILES_TO_PROCESS) {
+                log(`选择的文件太多: ${selectedFiles.length}, 限制: ${MAX_FILES_TO_PROCESS}`, 'warn');
+                return createErrorResponse(`Too many files selected (${selectedFiles.length}). Please select ${MAX_FILES_TO_PROCESS} or fewer.`, 413, corsHeaders);
             }
 
             // 生成选定文件的树形结构字符串
@@ -449,6 +406,9 @@ export async function onRequestPost(context) {
             const sizeLimitBytes = MAX_TOTAL_SIZE_MB * 1024 * 1024;
             let sizeLimitReached = false;
 
+            // 记录文件获取开始
+            log(`开始获取 ${selectedFiles.length} 个文件的内容...`, 'info');
+
             // 获取每个选定文件的内容
             const fetchPromises = selectedFiles.map(async (filePath) => {
                  if (sizeLimitReached) {
@@ -459,8 +419,8 @@ export async function onRequestPost(context) {
                      };
                  }
                 
-                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURI(filePath)}`;
-            //    console.log(`获取文件内容: ${filePath}`);
+                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${encodeURIComponent(filePath)}`;
+                log(`获取文件内容: ${filePath}`, 'debug');
                 
                 try {
                     const contentResponse = await fetch(rawUrl, { 
@@ -472,7 +432,7 @@ export async function onRequestPost(context) {
                         const fileSize = new Blob([fileContent]).size;
                         
                         if (totalSize + fileSize > sizeLimitBytes) {
-                            console.warn(`跳过 ${filePath}: 添加此文件(大小约 ${(fileSize/1024).toFixed(1)}KB) 将超过总大小限制 (${MAX_TOTAL_SIZE_MB}MB).`);
+                            log(`跳过 ${filePath}: 添加此文件(大小约 ${(fileSize/1024).toFixed(1)}KB) 将超过总大小限制 (${MAX_TOTAL_SIZE_MB}MB).`, 'warn');
                             sizeLimitReached = true;
                             return { 
                                 path: filePath, 
@@ -488,7 +448,7 @@ export async function onRequestPost(context) {
                             error: null 
                         };
                     } else {
-                        console.warn(`跳过文件 ${filePath}: 获取失败 (状态: ${contentResponse.status} ${contentResponse.statusText})`);
+                        log(`跳过文件 ${filePath}: 获取失败 (状态: ${contentResponse.status} ${contentResponse.statusText})`, 'warn');
                         const errorReason = contentResponse.status === 404 ? 
                             "File not found at this path/branch" : 
                             `HTTP Error ${contentResponse.status}`;
@@ -499,7 +459,7 @@ export async function onRequestPost(context) {
                         };
                     }
                 } catch (fetchError) {
-                    console.warn(`跳过文件 ${filePath}: 网络错误: ${fetchError.message}`);
+                    log(`跳过文件 ${filePath}: 网络错误: ${fetchError.message}`, 'warn');
                     return { 
                         path: filePath, 
                         content: null, 
@@ -509,6 +469,9 @@ export async function onRequestPost(context) {
             });
 
             const results = await Promise.all(fetchPromises);
+
+            // 记录文件获取完成
+            log(`文件内容获取完成`, 'info');
 
             // 组合结果到最终输出文本
             results.forEach(result => {
@@ -520,7 +483,7 @@ export async function onRequestPost(context) {
                  }
             });
 
-        //    console.log(`成功处理 ${fetchedFileCount} / ${selectedFiles.length} 个选定文件。总获取大小: ${(totalSize / (1024*1024)).toFixed(2)} MB.`);
+            log(`成功处理 ${fetchedFileCount} / ${selectedFiles.length} 个选定文件。总获取大小: ${(totalSize / (1024*1024)).toFixed(2)} MB.`, 'info');
             
             if (sizeLimitReached) {
                 combinedContent += `\n\n--- WARNING: Reached total size limit (${MAX_TOTAL_SIZE_MB}MB). Output may be incomplete. Processed ${fetchedFileCount} files. ---\n`;
@@ -541,29 +504,14 @@ export async function onRequestPost(context) {
 
         // --- 未知Action ---
         else {
-            console.error(`后端错误: 请求了未知的action: ${action}`);
-            return new Response(
-                JSON.stringify({ 
-                    error: `Unknown action: ${action}` 
-                }), 
-                { 
-                    status: 400, 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                }
-            );
+            log(`后端错误: 请求了未知的action: ${action}`, 'error');
+            return createErrorResponse(`Unknown action: ${action}`, 400, corsHeaders);
         }
 
     } catch (error) {
         // 捕获意外错误
-        console.error('Pages Function中的未处理错误:', error);
-        return new Response(
-            JSON.stringify({ 
-                error: `An unexpected server error occurred.` 
-            }), 
-            {
-                status: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-        );
+        log('Pages Function中的未处理错误:', 'error');
+        log(error, 'error');
+        return createErrorResponse(`An unexpected server error occurred.`, 500, corsHeaders);
     }
 }
