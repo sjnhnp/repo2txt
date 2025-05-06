@@ -1,70 +1,151 @@
-/* style.css (Additions/Modifications) */
+/* style.css */
 body {
-    font-family: sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     line-height: 1.6;
     margin: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    color: #333;
+    max-width: 900px; /* Limit overall width */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 h1, h3, h4 {
-    margin-bottom: 10px;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    color: #111;
+}
+h1 {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.3em;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 2em 0;
 }
 
 form label {
     display: block;
-    margin-top: 10px;
+    margin-top: 12px;
+    margin-bottom: 4px;
     font-weight: bold;
+    font-size: 0.95em;
 }
 
 form input[type="text"],
 form input[type="password"] {
-    width: 95%;
-    padding: 8px;
+    width: 95%; /* Adjust as needed */
+    padding: 10px;
     margin-top: 5px;
     margin-bottom: 10px;
-    max-width: 600px; /* Limit width */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    max-width: 600px; /* Limit input width */
 }
 
-form button, #outputActions button, #generationArea button, #filterArea button {
-    padding: 10px 15px;
+/* Basic styling for the tooltip hint */
+.tooltip {
+    cursor: help;
+    border-bottom: 1px dotted #007bff;
+    color: #007bff;
+    font-weight: normal;
+    font-size: 0.9em;
+}
+
+/* Basic hiding for password input text */
+input[type="password"] {
+    font-family: text-security-disc;
+    -webkit-text-security: disc;
+    -moz-text-security: disc;
+}
+
+/* --- Buttons --- */
+button {
+    padding: 10px 18px;
     margin-top: 10px;
-    margin-right: 5px;
+    margin-right: 8px;
     cursor: pointer;
     border: none;
-    border-radius: 4px;
-    background-color: #007bff;
+    border-radius: 5px;
+    background-color: #007bff; /* Default blue */
     color: white;
     font-size: 1em;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+    vertical-align: middle; /* Align button text and icons */
 }
 
-form button:disabled, #outputActions button:disabled, #generationArea button:disabled, #filterArea button:disabled {
+button:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+button:disabled {
     background-color: #cccccc;
     cursor: not-allowed;
+    opacity: 0.7;
 }
 
+/* Specific button colors */
 #fetchStructureBtn {
-    background-color: #17a2b8;
+    background-color: #17a2b8; /* Teal */
 }
-
 #generateTextBtn {
-     background-color: #28a745; /* Green like image */
+    background-color: #28a745; /* Green */
 }
 #copyBtn {
     background-color: #6c757d; /* Grey */
 }
 #downloadTxtBtn {
-     background-color: #6f42c1; /* Purple like image */
+    background-color: #6f42c1; /* Purple */
+}
+#selectAllBtn, #deselectAllBtn {
+    background-color: #ffc107; /* Yellow */
+    color: #333;
+    padding: 6px 12px; /* Smaller buttons */
+    font-size: 0.9em;
+    margin-right: 10px;
 }
 
+/* Add styles for icons used in buttons */
+button i {
+    vertical-align: -2px; /* Adjust icon alignment */
+    margin-right: 6px;
+    display: inline-block; /* Ensure icon takes space */
+}
+
+/* --- Status, Error, Spinner --- */
+.status {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.error {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    color: #721c24;
+    font-weight: bold;
+}
 
 .spinner {
-    border: 4px solid #f3f3f3; /* Light grey */
-    border-top: 4px solid #007bff; /* Blue */
+    border: 3px solid #f3f3f3; /* Light grey */
+    border-top: 3px solid #007bff; /* Blue */
     border-radius: 50%;
     width: 16px;
     height: 16px;
     animation: spin 1s linear infinite;
     display: inline-block;
-    margin-right: 5px;
+    margin-right: 8px;
     vertical-align: middle;
 }
 
@@ -73,49 +154,54 @@ form button:disabled, #outputActions button:disabled, #generationArea button:dis
     100% { transform: rotate(360deg); }
 }
 
-#statusArea {
-    margin-top: 15px;
-    font-weight: bold;
-}
-
-.error {
-    color: red;
-    margin-top: 15px;
-    font-weight: bold;
-}
-
-/* --- File Tree Styles (3) --- */
+/* --- File Filter/Selection Area (3) --- */
 #filterArea {
     margin-top: 20px;
-    border: 1px solid #eee;
-    padding: 15px;
-    background-color: #f9f9f9;
-     max-width: 700px; /* Limit width */
+    border-top: 1px solid #eee;
+    padding-top: 15px;
 }
+
 #extensionFilters {
     margin-bottom: 15px;
+    padding: 10px;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
 }
 #extensionFilters label {
     display: inline-block;
     margin-right: 15px;
+    margin-bottom: 5px; /* Spacing for wrapped lines */
     font-weight: normal;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+#extensionFilters input[type="checkbox"] {
+     margin-right: 5px;
+     vertical-align: middle;
 }
 
+/* File Tree Container */
 .file-tree {
-    max-height: 400px; /* Limit height and add scroll */
+    max-height: 450px; /* Limit height and add scroll */
     overflow-y: auto;
     border: 1px solid #ddd;
-    padding: 10px;
+    padding: 15px;
     background-color: white;
+    border-radius: 4px;
+    font-size: 0.95em; /* Slightly smaller font for tree */
 }
 
 .file-tree ul {
     list-style-type: none;
-    padding-left: 20px; /* Indentation for levels */
+    padding-left: 0; /* Reset padding */
+    margin: 0;
 }
 
 .file-tree li {
-    margin-bottom: 3px;
+    margin-bottom: 5px;
+    padding-left: 20px; /* Base indentation for files */
+    position: relative; /* Needed for pseudo-element lines if added */
 }
 
 .file-tree input[type="checkbox"] {
@@ -126,76 +212,77 @@ form button:disabled, #outputActions button:disabled, #generationArea button:dis
 .file-tree .tree-node { /* Span containing icon and name */
      display: inline-block;
      vertical-align: middle;
-     cursor: pointer; /* Make clickable to toggle children? (Advanced) */
+     word-break: break-all; /* Break long filenames */
 }
 
 .file-tree .node-icon {
     display: inline-block;
-    width: 1em; /* Space for icon */
+    width: 1.2em; /* Space for icon */
     margin-right: 4px;
+    text-align: center;
 }
 
 /* Basic icons using text/pseudo-elements */
-.file-tree .folder > .tree-node > .node-icon::before {
-    content: '📁'; /* Folder emoji */
-}
+/* Using simple file icon for all now */
 .file-tree .file > .tree-node > .node-icon::before {
      content: '📄'; /* File emoji */
+     font-size: 0.9em;
 }
-/* Add more specific icons based on file extension if desired */
+/* Placeholder text style */
+.placeholder-text {
+    color: #888;
+    font-style: italic;
+}
+
+.tree-actions {
+    margin-top: 10px;
+}
 
 
-/* --- Result Preview Styles (7) --- */
+/* --- Result Preview Area (7) --- */
 #resultContainer {
      margin-top: 20px;
-     border: 1px solid #eee;
-     padding: 15px;
-     background-color: #f9f9f9;
+     border-top: 1px solid #eee;
+     padding-top: 15px;
 }
 
 #outputPreview {
-    max-height: 500px;
-    overflow: auto;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    padding: 10px;
     margin-bottom: 15px;
 }
 
+#outputPreview label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #555;
+}
+
 #outputPreview pre {
-    margin: 0;
+    max-height: 500px; /* Limit height */
+    overflow: auto;
+    background-color: #fdfdfd;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-top: 0;
+    margin-bottom: 15px; /* Space between structure and content */
     white-space: pre-wrap; /* Wrap long lines */
     word-wrap: break-word;
+    border-radius: 4px;
 }
 #outputPreview code {
-    font-family: monospace;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
     font-size: 0.9em;
+    color: #333;
 }
 
 #structurePreview {
     color: #666; /* Lighter color for structure */
-    border-bottom: 1px dashed #ccc;
-    margin-bottom: 10px;
+    border-bottom: 1px dashed #ccc; /* Separator */
     padding-bottom: 10px;
+    margin-bottom: 10px;
 }
 
-
-/* Add some icon styles if using a library like css.gg */
-/* Example for css.gg icons used in buttons */
-@import url('https://css.gg/css?=|copy|poll|search-loading|software-download');
-
-button i {
-    vertical-align: middle;
-    margin-right: 5px;
-}
-/* Fix gg-search-loading alignment if needed */
-button .gg-search-loading {
-  vertical-align: -2px;
-}
-
-/* Optional: Hide password input text */
-input[type="password"] {
-    font-family: text-security-disc; /* Basic hiding */
-    -webkit-text-security: disc;
-    -moz-text-security: disc;
+#outputActions {
+    margin-top: 15px;
 }
