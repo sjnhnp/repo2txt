@@ -21,7 +21,7 @@ function createAuthCookie(value, env) {
     const cookieParts = [
         `${AUTH_COOKIE_NAME}=${value}`,
         `Path=/`,
-        `HttpOnly`,
+       // `HttpOnly`,
         `SameSite=Strict`
     ];
     // 在生产环境中 (当env.CF_ENV === 'production' 或类似检查，或者直接假设https) 添加 Secure
