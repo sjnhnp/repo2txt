@@ -745,51 +745,26 @@ function renderFileTree(items) {
 if (selectAllBtn) {
     selectAllBtn.addEventListener('click', () => {
         if (!fileHierarchy) return;
-        // Set all checkboxes linked in fileHierarchy to true
-        // The setAllVisibleCheckboxes needs to be careful about what "visible" means
-        // It should iterate fileHierarchy and set node.checkbox.checked = true for all that have one
-        function selectAllRecursively(node, checkedState) {
-            if (node.checkbox && !node.checkbox.disabled) {
-                node.checkbox.checked = checkedState;
-                node.checkbox.indeterminate = false; // Clear indeterminate state
-            }
-            if (node.type === 'tree') {
-                Object.values(node.children).forEach(child => selectAllRecursively(child, checkedState));
-            }
-        }
-        selectAllRecursively(fileHierarchy, true);
-        // After changing a large number of states, re-initialize parent states for the visual tree
-        // This re-applies indeterminate logic from bottom up.
-        // However, a full selectAll should make all parents also fully checked.
-        // The updateCheckStatus called internally by checkbox change handles this,
-        // but for a bulk operation, we might need to call initializeCheckboxStates on the root,
-        // or manually ensure all parent checkboxes are also set to 'checked'.
-        // The simplest way is to just re-render, or call initializeCheckboxStates
-        renderFileTree(fileTreeData); // Re-render to reflect batch changes and update parent states
+        // 直接批量勾选所有节点
+        setAllVisibleCheckboxes(fileHierarchy, true);
+        // 更新所有父节点的 indeterminate/checked 状态
+        initializeCheckboxStates(fileHierarchy);
     });
 } else {
-     console.warn("Warning: selectAllBtn element not found. 'Select All' functionality will not work.");
+    console.warn("Warning: selectAllBtn element not found. 'Select All' functionality will not work.");
 }
 
 if (deselectAllBtn) {
     deselectAllBtn.addEventListener('click', () => {
         if (!fileHierarchy) return;
-        function deselectAllRecursively(node, checkedState) {
-            if (node.checkbox && !node.checkbox.disabled) {
-                node.checkbox.checked = checkedState;
-                node.checkbox.indeterminate = false;
-            }
-            if (node.type === 'tree') {
-                Object.values(node.children).forEach(child => deselectAllRecursively(child, checkedState));
-            }
-        }
-        deselectAllRecursively(fileHierarchy, false);
-        renderFileTree(fileTreeData); // Re-render
+        // 直接批量取消勾选所有节点
+        setAllVisibleCheckboxes(fileHierarchy, false);
+        // 更新所有父节点的 indeterminate/checked 状态
+        initializeCheckboxStates(fileHierarchy);
     });
 } else {
     console.warn("Warning: deselectAllBtn element not found. 'Deselect All' functionality will not work.");
 }
-
 
 if (generateTextBtn) {
     generateTextBtn.addEventListener('click', async () => {
