@@ -4,7 +4,7 @@ const ALLOWED_EXTENSIONS = new Set([
     '.xml', '.yaml', '.yml', '.md', '.markdown', '.txt', '.py', '.java', '.c', '.cpp',
     '.h', '.hpp', '.cs', '.go', '.php', '.rb', '.swift', '.kt', '.kts', '.sh', '.bash',
     '.zsh', '.sql', '.dockerfile', 'dockerfile', '.env', '.gitignore', '.gitattributes',
-    '.toml', '.ini', '.cfg', '.conf', '.properties', '.gradle', '.lua', '.rs',
+    '.toml', '.ini', '.cfg', '.conf', '.properties', '.gradle', '.lua', '.rs', '.mdx',
 ]);
 
 const DEFAULT_EXCLUDES = [
